@@ -1,0 +1,11 @@
+﻿[dotenv@17.3.1] injecting env (10) from ..\.env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+Compiled 5 Solidity files successfully (evm target: paris).
+[dotenv@17.3.1] injecting env (0) from ..\.env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+Deploying contracts with the account: 0x47F9B7Ad5A98D2F805c283BC6dDBF02a0C12111E
+PQCVault deployed to: 0xAe49cCE89F380Fcb7FBb085EEC4b60467f4cEbaa
+VaultUSD Token deployed to: 0xf72a89F14De79Cb3D6fB15b41E83137521272777
+CreditManager deployed to: 0x20248959E308b73f94b35E5BB71D7fB51B6B6312
+Transferring VaultUSD ownership to CreditManager...
+Authorizing CreditManager as a Vault Manager...
+CreditManager successfully authorized.
+Deployment completed successfully!

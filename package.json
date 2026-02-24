@@ -1,0 +1,24 @@
+{
+  "name": "bnb-collateral-credit-system",
+  "version": "1.0.0",
+  "description": "Post-Quantum Secure (PQC) Smart Collateral-Based Credit System",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "pqc",
+    "bnb",
+    "opbnb",
+    "greenfield",
+    "qidcloud"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@bnb-chain/greenfield-js-sdk": "^2.2.2",
+    "@qidcloud/sdk": "^1.2.4",
+    "dotenv": "^17.3.1",
+    "ethers": "^6.16.0"
+  }
+}

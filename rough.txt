@@ -1,0 +1,12 @@
+npx hardhat run scripts/deploy.ts --network opbnb-testnet
+[dotenv@17.3.1] injecting env (10) from ..\.env -- tip: 🛡️ auth for agents: https://vestauth.com
+[dotenv@17.3.1] injecting env (0) from ..\.env -- tip: 🛡️ auth for agents: https://vestauth.com
+Deploying contracts with the account: 0x47F9B7Ad5A98D2F805c283BC6dDBF02a0C12111E
+PQCVault deployed to: 0x353c722537450B764984F22869ac6Fb2225C0111
+CreditManager deployed to: 0xC4E50D8Eb1c0F423cE5343e62Ce156370dc464F0
+Authorizing CreditManager as a Vault Manager...
+CreditManager successfully authorized.
+Deployment completed successfully!
+
+
+
