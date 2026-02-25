@@ -49,7 +49,7 @@ npx hardhat run scripts/deploy.ts --network opbnb_testnet
 ```bash
 cd backend
 npm install
-npm run dev
+npx tsx watch src/index.ts
 ```
 
 ### **Step 3: Frontend (React + Vite)**
