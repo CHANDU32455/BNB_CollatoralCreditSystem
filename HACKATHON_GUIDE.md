@@ -1,87 +1,43 @@
 # 🏆 BNB Collateral Credit System: Hackathon Guide
 
 ## 1. What is it? (The Concept)
-The **BNB Collateral Credit System** is a next-generation decentralized lending and payment platform. It allows users to lock **tBNB** as collateral in a non-custodial vault to instantly unlock high-liquidity **vUSD (Vault Credit)**. 
+The **BNB Collateral Credit System** is a next-generation decentralized lending and credit platform. Users lock **tBNB** as collateral in a non-custodial vault to instantly unlock high-liquidity **vUSD (Vault Credit)**. 
 
-Unlike traditional lending, this system features a **PQC-Secured BNPL (Buy Now Pay Later) Marketplace**, where credit can be spent instantly at real-world simulated merchants using **Post-Quantum Cryptography**.
-
----
-
-## 2. Why is it? (The Problem & Solution)
-*   **The Problem:** Most DeFi lending platforms are clunky and disconnected from real commerce. Furthermore, as quantum computing advances, traditional ECDSA signatures (used by MetaMask) are at risk of being compromised.
-*   **The Solution:** 
-    *   **Quantum Resistance:** We use **ML-DSA-65** (NIST-standard Module-Lattice-Based Digital Signature Algorithm) via **QidCloud** to secure authorizations.
-    *   **Seamless Spending:** Our **Auto-Borrow Bridge** eliminates the friction of manual borrowing. If you have collateral, you can spend—period.
+### The Break-through:
+We combine **Post-Quantum Cryptography** with **Autonomous Risk Management**. The system is not just protected against hackers—it's protected against the future "Quantum Threat" and market volatility.
 
 ---
 
-## 3. How is it? (The Architecture)
-*   **Blockchain (opBNB):** High-speed, low-cost Layer 2 for smart contract execution. 
-*   **Decentralized Identity (QidCloud):** PQC Authentication and ML-DSA transaction signing.
-*   **Risk Engine (BscScan V2):** Analyzes user transaction history on-chain to provide a "Trust Factor Bonus," increasing borrow capacity by up to 5%.
-*   **Mini-Indexer (Backend):** A custom Node.js service that persists transaction history and PQC activity, ensuring a robust audit trail even if RPC providers are laggy.
+## 2. The Core Innovations
+*   **🔒 Quantum-Safe Identity:** Uses **ML-DSA-65** (Module-Lattice-Based Digital Signature Algorithm) via **QidCloud** to secure all authorizations.
+*   **🤖 Autonomous Guardian Bot:** A 24/7 background service that monitors the system's solvency. It acts as a "Social Guardian"—when a user's health falls below the safe threshold, the bot automatically executes a PQC-signed liquidation mandate.
+*   **📈 Live-To-Chain Oracle:** Syncs the **Actual BNB/USDT Price** from Binance directly to the opBNB blockchain every minute.
+*   **📡 Greenfield Immutable Auditing:** Every critical action (High-value borrows, auto-liquidations) is uploaded to **BNB Greenfield**. This creates a "Black Box" recorder for the protocol that can never be deleted or tampered with.
 
 ---
 
-## 4. Key Features
-1.  **Glassmorphism Dashboard:** A premium, neon-themed UI designed to "WOW" judges at first glance.
-2.  **PQC Authorization Modal:** Every merchant payment triggers a high-fidelity confirmation dialog, simulating a secure hardware-enclave signing event.
-3.  **Credit Power Preview:** Users see exactly how much credit they will gain *before* they deposit collateral.
-4.  **Auto-Borrow Logic:** The system automatically converts collateral to spendable credit during checkout if the user's balance is low.
-5.  **Exportable Audit Trail:** A full history of all actions can be exported as a CSV for regulatory compliance.
+## 3. High-Level Architecture
+1.  **opBNB Layer 2:** The "High-Speed Core" where the smart contracts live.
+2.  **Binance API:** The "Live Feed" that informs the system of real-world prices.
+3.  **QidCloud SDK:** The "Security Enclave" that handles PQC signatures and biometric handshakes.
+4.  **BNB Greenfield:** The "Audit Layer" that ensures 100% transparency for regulators and users.
+5.  **BscScan V2 API:** The "Reputation Layer" that calculates dynamic Trust Bonuses for users based on their on-chain history.
 
 ---
 
-## 5. Technical Setup (How to Run)
-
-### **Prerequisites**
-*   Node.js (v18+)
-*   Metamask (Connected to opBNB Testnet)
-
-### **Step 1: Smart Contracts**
-```bash
-cd contracts
-npm install
-npx hardhat run scripts/deploy.ts --network opbnb_testnet
-```
-
-### **Step 2: Backend (Risk Engine & Indexer)**
-```bash
-cd backend
-npm install
-npx tsx watch src/index.ts
-```
-
-### **Step 3: Frontend (React + Vite)**
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## 4. Key Demo Checklist
+1.  **PQC Login:** Show the ML-DSA-65 handshake.
+2.  **Live Price Heartbeat:** Watch the "Syncing" indicator and the price wobbling exactly like the real market.
+3.  **Market Crash Simulation:** Click **"Crash"** to drop the price instantly and watch the **Guardian Bot** trigger an auto-liquidation.
+4.  **Resolution Proofs:** Go to **Liquidation Hub** to see the "Post-Mortem" results and click the **Greenfield link** to see the immutable record.
 
 ---
 
-## 6. Demonstration Script (How to Present)
-
-### **Introduction (30s)**
-"Welcome to the BNB Collateral Credit System. We aren't just building a lending app; we're building the first **Post-Quantum Secure Commerce Bridge** on opBNB. Traditional DeFi is vulnerable to the quantum threat—our system is secured by ML-DSA signatures before the first qubit even drops."
-
-### **The "Trust" Bonus (60s)**
-"Notice how the user's **Reputation Badge** changes. Our backend analyzes their BscScan history to reward 'Veteran' users with a lower LTV requirement. We're using real on-chain data to make credit smarter."
-
-### **The Seamless Spend (60s)**
-"Watch the Marketplace. I want this Hardware Wallet, but I have $0 credit. Traditionally, I'd have to leave, borrow, and return. Here, I just click 'Authorize.' Our PQC Bridge automatically calculates my collateral, triggers an auto-borrow on opBNB, and completes the payment in one atomic-like flow."
-
-### **Conclusion (30s)**
-"Security meets Simplicity. This is the future of collateralized credit on the BNB Chain."
+## 5. Lessons Learned
+*   **Decentralized UX:** We learned that user management on Greenfield can be slow for end-users, so we implemented **Protocol-Managed Storage**. This gives users the benefit of decentralized storage with 0ms of friction.
+*   **LTV Paradox:** Large collateral with tiny debt creates massive numbers (Infinity). We implemented **Smart Caps (99.99)** to keep the UI professional and readable.
+*   **PQC Integration:** Integrating ML-DSA signatures into a standard React flow is challenging but essential for the "Quantum Readiness" of the BNB Ecosystem.
 
 ---
 
-## 7. Lessons Learned & Building Process
-*   **Challenge:** RPC Reliability. Public testnet RPCs can be flaky, causing the UI to show $0 balances.
-*   **Solution:** We built a custom **Backend Indexer** that persists activity logs. This ensures the user's purchase history and "Veteran" status are always available and lightning-fast.
-*   **Learning:** Building with PQC (Post-Quantum Cryptography) requires a shift in how we think about signing. Integrating ML-DSA signatures showed me that "Future-Proofing" is a UX challenge as much as a technical one.
-
----
-
-**Built with ❤️ for the BNB Chain Hackathon.** 🏆🚀🛡️
+**Built for the future of BNB Chain.** 🏆🚀🛡️

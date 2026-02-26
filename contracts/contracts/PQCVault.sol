@@ -75,6 +75,19 @@ contract PQCVault is ReentrancyGuard, Ownable {
 
         emit CollateralWithdrawn(borrower, amount);
     }
+
+    /**
+     * @dev Allows users to withdraw their own collateral if they have no debt.
+     */
+    function withdrawCollateral(uint256 amount) external nonReentrant {
+        require(vaults[msg.sender].collateralAmount >= amount, "Vault: Insufficient balance");
+        require(vaults[msg.sender].debtAmount == 0, "Vault: Cannot withdraw with active debt");
+
+        vaults[msg.sender].collateralAmount -= amount;
+        payable(msg.sender).transfer(amount);
+
+        emit CollateralWithdrawn(msg.sender, amount);
+    }
     
     receive() external payable {
         vaults[msg.sender].collateralAmount += msg.value;

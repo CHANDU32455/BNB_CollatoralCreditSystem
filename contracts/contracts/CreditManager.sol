@@ -103,6 +103,7 @@ contract CreditManager is ReentrancyGuard, Ownable {
 
     /**
      * @dev Default Logic: Liquidate a position that has fallen below the health threshold.
+     * Liquidator pays debt in BNB (for hackathon demo) and receives collateral + 5% bonus.
      */
     function liquidate(address borrower) external payable nonReentrant {
         uint256 health = getHealthFactor(borrower);
@@ -124,6 +125,12 @@ contract CreditManager is ReentrancyGuard, Ownable {
         
         // Seize collateral from vault
         vault.withdrawToLiquidator(borrower, msg.sender, collateralToSeize);
+
+        // Refund any excess BNB sent (Safety first)
+        uint256 excess = msg.value - debtInBnb;
+        if (excess > 0) {
+            payable(msg.sender).transfer(excess);
+        }
 
         emit LiquidationExecuted(borrower, msg.sender, debt, collateralToSeize);
     }

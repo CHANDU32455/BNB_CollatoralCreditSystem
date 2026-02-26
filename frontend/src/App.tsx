@@ -12,13 +12,16 @@ import {
   ChevronRight,
   Zap,
   ShoppingCart,
-  LogOut
+  LogOut,
+  AlertTriangle,
+  History
 } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_API_BASE;
 const VAULT_ADDRESS = import.meta.env.VITE_VAULT_ADDRESS;
 const CREDIT_MANAGER_ADDRESS = import.meta.env.VITE_CREDIT_MANAGER_ADDRESS;
 const CREDIT_TOKEN_ADDRESS = import.meta.env.VITE_CREDIT_TOKEN_ADDRESS;
+const OLD_VAULT_ADDRESS = import.meta.env.VITE_OLD_VAULT_ADDRESS;
 
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
@@ -44,6 +47,7 @@ const CREDIT_ABI = [
   "function borrow(uint256 amount) external",
   "function getHealthFactor(address user) public view returns (uint256)",
   "function getLatestPrice() public view returns (int256)",
+  "function liquidate(address borrower) external payable",
   "event CreditIssued(address indexed user, uint256 amount)"
 ];
 
@@ -57,13 +61,17 @@ function App() {
   const [pqcToken, setPqcToken] = useState<string | null>(localStorage.getItem('vault_pqcToken'));
   const [stats, setStats] = useState({ collateral: '0.00', debt: '0.00', borrowCapacity: '0.00', price: '0', balance: '0.00', creditBalance: '0.00' });
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [borrowAmount, setBorrowAmount] = useState('');
   const [riskData, setRiskData] = useState<any>(null);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [chainInfo, setChainInfo] = useState({ name: 'opBNB', block: '0' });
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'marketplace' | 'security'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'marketplace' | 'security' | 'liquidation'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasMandate, setHasMandate] = useState(true); // Default to true to avoid flicker
+  const [legacyCollateral, setLegacyCollateral] = useState('0.00');
   const [pendingPurchase, setPendingPurchase] = useState<{ merchantName: string; amount: number } | null>(null);
 
   const showNotify = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -107,51 +115,62 @@ function App() {
     }
   };
 
-  const updateStats = useCallback(async (userAddr: string) => {
+  const fetchHistory = useCallback(async (userAddr: string, page = 1, append = false) => {
+    try {
+      const hResp = await axios.get(`${BACKEND_URL}/api/activity/history/${userAddr}?page=${page}&limit=10`);
+      const { data, hasMore } = hResp.data;
+
+      const formatted = data.map((h: any) => ({
+        ...h,
+        date: new Date(h.timestamp).toLocaleTimeString(),
+        amount: h.amount || '0.00'
+      }));
+
+      if (append) {
+        setTransactions(prev => [...prev, ...formatted]);
+      } else {
+        setTransactions(formatted);
+      }
+
+      setHistoryPage(page);
+      setHasMoreHistory(hasMore);
+    } catch (e) {
+      console.warn("[History] Fetch failed", e);
+    }
+  }, []);
+
+  const updateStats = useCallback(async (userAddr: string, partial = false) => {
     if (!userAddr) return;
     setIsSyncing(true);
     console.log("[Stats] Syncing for address:", userAddr);
 
     try {
-      if (!(window as any).ethereum) {
-        console.warn("[Stats] No ethereum provider found");
-        return;
-      }
+      if (!(window as any).ethereum) return;
       const provider = new ethers.BrowserProvider((window as any).ethereum);
 
+      // 1. Basic Network Info (Always)
       const network = await provider.getNetwork();
-      const isWrongNetwork = network.chainId !== 5611n;
-
-      if (isWrongNetwork) {
-        setChainInfo({ name: 'WRONG NETWORK (Switch to opBNB)', block: '...' });
-        console.warn("User on wrong network:", network.chainId);
+      if (network.chainId !== 5611n) {
+        setChainInfo({ name: 'WRONG NETWORK', block: '...' });
         return;
       }
+      const blockNum = await provider.getBlockNumber();
+      setChainInfo({ name: 'opBNB Testnet', block: blockNum.toString() });
 
-      try {
-        const blockNum = await provider.getBlockNumber();
-        setChainInfo({ name: 'opBNB Testnet', block: blockNum.toString() });
-      } catch (e) {
-        console.warn("[Stats] Block fetch failed");
-      }
-
+      // 2. Financial Stats (Always)
       const vaultContract = new ethers.Contract(VAULT_ADDRESS, VAULT_ABI, provider);
       const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, provider);
       const tokenContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, ERC20_ABI, provider);
 
-      // Fetch individually with explicit fallbacks
-      const vaultData = await vaultContract.vaults(userAddr).catch(e => { console.error("[Stats] Vault call failed", e); return { collateralAmount: 0n, debtAmount: 0n }; });
-      const balanceRaw = await provider.getBalance(userAddr).catch(e => { console.error("[Stats] Balance call failed", e); return 0n; });
-      const creditRaw = await tokenContract.balanceOf(userAddr).catch(e => { console.error("[Stats] Token call failed", e); return 0n; });
-      const rawPrice = await creditContract.getLatestPrice().catch(e => { console.error("[Stats] Price call failed", e); return 0n; });
+      const [vaultData, balanceRaw, creditRaw, rawPrice] = await Promise.all([
+        vaultContract.vaults(userAddr).catch(() => ({ collateralAmount: 0n, debtAmount: 0n })),
+        provider.getBalance(userAddr).catch(() => 0n),
+        tokenContract.balanceOf(userAddr).catch(() => 0n),
+        creditContract.getLatestPrice().catch(() => 0n)
+      ]);
 
-      // Fallback logic for price
       const bnbPrice = (rawPrice && rawPrice > 0n) ? parseFloat(rawPrice.toString()) / 1e8 : 586.50;
-      const walletBalance = parseFloat(ethers.formatEther(balanceRaw)).toFixed(4);
-      const creditBalance = parseFloat(ethers.formatEther(creditRaw)).toFixed(2);
-
       const bonusFactor = riskData ? parseFloat(riskData.trustFactorBonus) / 100 : 0;
-      const effectiveLTV = 0.7 + bonusFactor;
 
       const collatAmount = parseFloat(ethers.formatEther(vaultData.collateralAmount || 0n));
       const debtAmount = parseFloat(ethers.formatEther(vaultData.debtAmount || 0n));
@@ -160,30 +179,34 @@ function App() {
       setStats({
         collateral: collatAmount.toFixed(4),
         debt: debtAmount.toFixed(2),
-        borrowCapacity: (collatUsd * effectiveLTV - debtAmount).toFixed(2),
+        borrowCapacity: (collatUsd * (0.7 + bonusFactor) - debtAmount).toFixed(2),
         price: bnbPrice.toFixed(2),
-        balance: walletBalance,
-        creditBalance: creditBalance
+        balance: parseFloat(ethers.formatEther(balanceRaw)).toFixed(4),
+        creditBalance: parseFloat(ethers.formatEther(creditRaw)).toFixed(2)
       });
 
-      // Events from Indexer
-      try {
-        const hResp = await axios.get(`${BACKEND_URL}/api/activity/history/${userAddr}`);
-        if (Array.isArray(hResp.data)) {
-          setTransactions(hResp.data.map((h: any) => ({
-            ...h,
-            date: new Date(h.timestamp).toLocaleTimeString(),
-            amount: h.amount || '0.00'
-          })));
-        }
-      } catch (e) { console.warn("[Stats] Indexer fetch failed"); }
+      // 3. Tab-Specific Data
+      if (activeTab === 'dashboard' || !partial) {
+        await fetchHistory(userAddr, 1, false);
+      }
+
+      if (activeTab === 'security' || !partial) {
+        const mResp = await axios.get(`${BACKEND_URL}/api/vault/mandate-status/${userAddr}`);
+        setHasMandate(mResp.data.hasMandate);
+      }
+
+      if (!partial) {
+        const legacyVault = new ethers.Contract(OLD_VAULT_ADDRESS, VAULT_ABI, provider);
+        const lData = await legacyVault.vaults(userAddr);
+        setLegacyCollateral(ethers.formatEther(lData.collateralAmount || 0n));
+      }
 
     } catch (err) {
       console.error("[Stats] Critical sync error:", err);
     } finally {
       setIsSyncing(false);
     }
-  }, [riskData]);
+  }, [riskData, activeTab, fetchHistory]);
 
   const fetchRiskScore = useCallback(async (addr: string) => {
     try {
@@ -384,24 +407,168 @@ function App() {
     }
   };
 
+  const handleUpgradeSecurity = async () => {
+    if (!address) return;
+    try {
+      setLoading(true);
+      showNotify("Authorizing Post-Quantum Security Upgrade...", "info");
+
+      // Simulate/Trigger the PQC Agreement Signing
+      const resp = await axios.post(`${BACKEND_URL}/api/vault/sign-agreement`, {
+        userAddress: address,
+        loanDetails: {
+          upgrade: true,
+          type: "SECURITY_UPGRADE_MANDATE",
+          description: "Transitioning legacy vault to Greenfield-backed PQC Mandate"
+        }
+      });
+
+      if (resp.data.success) {
+        showNotify("PQC Mandate anchored to BNB Greenfield!", "success");
+        setHasMandate(true);
+        logActivity("UPGRADE", "Vault upgraded to PQC Mandate", "N/A", "0.00");
+        updateStats(address);
+      }
+    } catch (err) {
+      console.error("Upgrade failed", err);
+      showNotify("Security upgrade failed. Connection lost.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const migrateLegacyCollateral = async () => {
+    if (!address || loading) return;
+    try {
+      setLoading(true);
+      showNotify("Migration Started: Step 1/3 (Releasing Legacy Funds)", "info");
+
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+
+      const legacyVault = new ethers.Contract(OLD_VAULT_ADDRESS, [
+        "function withdrawCollateral(uint256) external",
+        "function withdraw(uint256) external",
+        "function withdrawToLiquidator(address, address, uint256) external",
+        "function isManager(address) view returns (bool)",
+        "function setManager(address, bool) external"
+      ], signer);
+
+      let txWithdraw;
+      try {
+        txWithdraw = await legacyVault.withdrawCollateral(ethers.parseEther(legacyCollateral));
+      } catch (e: any) {
+        console.warn("Retrying with manager authorization...", e);
+        const isUserMgr = await legacyVault.isManager(address);
+        if (!isUserMgr) {
+          const txMgr = await legacyVault.setManager(address, true);
+          await txMgr.wait();
+        }
+        txWithdraw = await legacyVault.withdrawToLiquidator(address, address, ethers.parseEther(legacyCollateral));
+      }
+
+      await txWithdraw.wait();
+      showNotify("Step 1 Complete. Step 2/3: Moving to PQC Vault...", "success");
+
+      const txDeposit = await signer.sendTransaction({
+        to: VAULT_ADDRESS,
+        value: ethers.parseEther(legacyCollateral)
+      });
+      await txDeposit.wait();
+
+      showNotify("Step 2 Complete. Step 3/3: PQC Permission Mandate...", "info");
+      await handleUpgradeSecurity();
+
+      showNotify("Quantum-Secure Migration Complete! 🛡️", "success");
+      setLegacyCollateral('0.00'); // Optimistic clear
+      logActivity("MIGRATION", `Migrated ${legacyCollateral} tBNB to PQC Vault`, txDeposit.hash, legacyCollateral);
+      updateStats(address);
+    } catch (err: any) {
+      console.error("Migration failed", err);
+      const errorMsg = err.reason || err.message || "Unknown error";
+      showNotify(`Migration Halted: ${errorMsg.slice(0, 50)}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const simulateMarketCrash = async () => {
+    try {
+      setLoading(true);
+      showNotify("Injecting market volatility into the Guardian network...", "info");
+
+      const resp = await axios.post(`${BACKEND_URL}/api/simulate/crash`);
+
+      if (resp.data.success) {
+        showNotify("Price plunged to $200! Guardian Bot is activating...", "success");
+        setTimeout(() => updateStats(address!), 2000);
+      }
+    } catch (err) {
+      console.error("Crash failed", err);
+      showNotify("Simulation failed. Check Guardian connectivity.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const simulateMarketRecovery = async () => {
+    try {
+      setLoading(true);
+      showNotify("Restoring market equilibrium...", "info");
+      const resp = await axios.post(`${BACKEND_URL}/api/simulate/recover`);
+      if (resp.data.success) {
+        showNotify("Real-time market sync resumed!", "success");
+        setTimeout(() => updateStats(address!), 1000);
+      }
+    } catch (err) {
+      showNotify("Market recovery failed.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- ROUTING ENGINE ---
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace('#', '') as any;
+      if (['dashboard', 'marketplace', 'security', 'liquidation'].includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
+
   const healthFactor = (() => {
     const colUsed = parseFloat(stats.collateral);
     const debtUsed = parseFloat(stats.debt);
     const price = parseFloat(stats.price);
     const potentialAdd = parseFloat(borrowAmount) || 0;
+    const bonusLTV = riskData ? parseFloat(riskData.trustFactorBonus) / 100 : 0;
 
     const totalDebt = debtUsed + potentialAdd;
-    if (totalDebt === 0) return '99.90';
+    if (totalDebt <= 0.0001) return '99.99';
 
-    // (Collateral * Price * 0.8) / Debt
-    return ((colUsed * price * 0.8) / totalDebt).toFixed(2);
+    // (Collateral * Price * (Baseline LTV + Bonus)) / Debt
+    const hf = (colUsed * price * (0.7 + bonusLTV)) / totalDebt;
+    return hf > 99.99 ? '99.99' : hf.toFixed(2);
   })();
 
   useEffect(() => {
     if (address) {
-      updateStats(address);
-      // Auto-refresh every 30s
-      const timer = setInterval(() => updateStats(address), 30000);
+      updateStats(address, true);
+    }
+  }, [address, activeTab, updateStats]);
+
+  useEffect(() => {
+    if (address) {
+      // High-frequency sync for live price feel
+      const timer = setInterval(() => updateStats(address, true), 15000);
       return () => clearInterval(timer);
     }
   }, [address, updateStats]);
@@ -587,10 +754,17 @@ function App() {
       <div className="glass-panel" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <span className="label">Available Borrow Liquidity</span>
-            <div className="value" style={{ fontSize: '3.5rem' }}>${stats.borrowCapacity} <span className="text-muted" style={{ fontSize: '1.2rem' }}>USD</span></div>
+            <span className="label" style={{ color: parseFloat(healthFactor) < 1.0 ? 'var(--danger)' : 'inherit' }}>
+              {parseFloat(healthFactor) < 1.0 ? '⚠ SYSTEM BREACH / CAPACITY EXHAUSTED' : 'Available Borrow Liquidity'}
+            </span>
+            <div className="value" style={{ fontSize: '3.5rem', color: parseFloat(healthFactor) < 1.0 ? 'var(--danger)' : 'inherit' }}>
+              ${stats.borrowCapacity} <span className="text-muted" style={{ fontSize: '1.2rem' }}>USD</span>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <p className="text-muted" style={{ fontSize: '0.8rem' }}>BNB Price: ${stats.price}</p>
+              <p className="text-muted" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                BNB Price: <span style={{ color: parseFloat(healthFactor) < 1.0 ? 'var(--danger)' : 'var(--success)', fontWeight: 600 }}>${stats.price}</span>
+                <span className="status-badge" style={{ fontSize: '0.5rem', padding: '1px 5px', opacity: 0.8, background: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--success)', color: 'var(--success)' }}>On-Chain Oracle</span>
+              </p>
               <button
                 onClick={() => address && updateStats(address)}
                 disabled={isSyncing}
@@ -829,50 +1003,72 @@ function App() {
     <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', animation: 'fadeIn 0.4s ease-out' }}>
       <div className="glass-panel">
         <h4 style={{ marginBottom: '1.5rem', fontSize: '1.2rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <RefreshCw size={20} /> ON-CHAIN ACTIVITY LOG
+          <History size={20} /> ON-CHAIN ACTIVITY LOG
         </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '0.5rem' }}>
           {transactions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
-              <RefreshCw className="text-muted" size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+              <History className="text-muted" size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
               <p className="text-muted">No recent on-chain events found.</p>
             </div>
           ) : (
-            transactions.map((tx, i) => (
-              <div key={i} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', borderLeft: `4px solid ${tx.type === 'Deposit' ? 'var(--success)' : (tx.type === 'BORROW' ? 'var(--primary)' : 'var(--accent)')}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ backgroundColor: tx.type === 'Deposit' ? 'rgba(34, 197, 94, 0.1)' : (tx.type === 'BORROW' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(189, 0, 255, 0.1)'), padding: '0.75rem', borderRadius: '12px' }}>
-                    {tx.type === 'Deposit' ? <ArrowUpCircle size={20} className="text-success" /> : (tx.type === 'BORROW' ? <Zap size={20} className="text-primary" /> : <ShoppingCart size={20} style={{ color: 'var(--accent)' }} />)}
+            <>
+              {transactions.map((tx, i) => (
+                <div key={i} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', borderLeft: `4px solid ${tx.type.includes('LIQ') ? 'var(--danger)' : (tx.type === 'Deposit' ? 'var(--success)' : (tx.type === 'BORROW' ? 'var(--primary)' : 'var(--accent)'))}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ backgroundColor: tx.type === 'Deposit' ? 'rgba(34, 197, 94, 0.1)' : (tx.type === 'BORROW' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(189, 0, 255, 0.1)'), padding: '0.75rem', borderRadius: '12px' }}>
+                      {tx.type === 'Deposit' ? <ArrowUpCircle size={20} className="text-success" /> : (tx.type === 'BORROW' ? <Zap size={20} className="text-primary" /> : <ShieldCheck size={20} style={{ color: 'var(--accent)' }} />)}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '1rem' }}>{tx.type.replace('_', ' ')}</div>
+                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                          {tx.txHash && tx.txHash !== 'N/A' && (
+                            <a
+                              href={`https://testnet.opbnbscan.com/tx/${tx.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            >
+                              TX: {tx.txHash.slice(0, 8)}... <ExternalLink size={10} />
+                            </a>
+                          )}
+                          {tx.greenfieldCid && (
+                            <a
+                              href={`https://greenfield-sp.testnet.bnbchain.org/view/${tx.greenfieldCid}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#00ffcc', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}
+                            >
+                              Greenfield Log <ExternalLink size={10} />
+                            </a>
+                          )}
+                        </div>
+                        <div style={{ marginTop: '0.2rem' }}>• {tx.date}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '1rem' }}>{tx.type}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                      {tx.txHash ? (
-                        <a
-                          href={`https://testnet.opbnbscan.com/tx/${tx.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                        >
-                          {tx.txHash.slice(0, 10)}... <ExternalLink size={10} />
-                        </a>
-                      ) : (
-                        `Verified On-chain`
-                      )}
-                      • {tx.date}
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                      {['Deposit', 'MIGRATION'].includes(tx.type) ? '' : '$'}{tx.amount} {['Deposit', 'MIGRATION'].includes(tx.type) ? 'tBNB' : 'USD'}
+                    </div>
+                    <div className={`status-badge ${tx.greenfieldCid ? 'status-success' : 'status-warning'}`} style={{ fontSize: '0.6rem', marginTop: '0.3rem', background: tx.greenfieldCid ? 'rgba(0, 255, 204, 0.1)' : '' }}>
+                      {tx.greenfieldCid ? 'Anchored to Greenfield' : 'PQC Verified'}
                     </div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                    {tx.type === 'Deposit' ? '' : '$'}{tx.amount} {tx.type === 'Deposit' ? 'tBNB' : 'USD'}
-                  </div>
-                  <div className="status-badge status-success" style={{ fontSize: '0.6rem', marginTop: '0.3rem' }}>
-                    PQC Verified
-                  </div>
-                </div>
-              </div>
-            ))
+              ))}
+
+              {hasMoreHistory && (
+                <button
+                  onClick={() => fetchHistory(address!, historyPage + 1, true)}
+                  className="btn-outline"
+                  style={{ padding: '0.75rem', marginTop: '1rem', width: '100%', justifyContent: 'center' }}
+                >
+                  Load Older Transactions <ChevronRight size={16} />
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -932,10 +1128,161 @@ function App() {
     </div>
   );
 
+  const renderLiquidation = () => (
+    <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
+      <div className="glass-panel" style={{ marginBottom: '2rem', textAlign: 'center', padding: '3rem', border: '1px solid var(--danger)', background: 'rgba(239, 68, 68, 0.05)' }}>
+        <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--danger)' }}>Liquidation Engine</h2>
+        <p className="text-muted">Protect the system by liquidating under-collateralized positions. Earn a 5% bonus reward.</p>
+      </div>
+
+      <div className="glass-panel">
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--danger)' }}>
+          <AlertTriangle size={20} /> AT-RISK VAULTS
+        </h4>
+
+        {parseFloat(healthFactor) < 1.1 ? (
+          <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', border: '1px solid var(--danger)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: '12px' }}>
+                <AlertTriangle size={24} className="text-danger" />
+              </div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>{address?.slice(0, 10)}... (YOU)</p>
+                <p className="text-danger" style={{ fontSize: '0.8rem', fontWeight: 600 }}>Health Factor: {healthFactor}</p>
+                <p className="text-muted" style={{ fontSize: '0.7rem' }}>Debt: ${stats.debt} | Collateral: {stats.collateral} tBNB</p>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '0.5rem' }}>Expected Reward: ~{(parseFloat(stats.collateral) * 0.05).toFixed(4)} tBNB</p>
+              <button
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const provider = new ethers.BrowserProvider((window as any).ethereum);
+                    const signer = await provider.getSigner();
+                    const contract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
+
+                    const debtInEth = ethers.parseEther((parseFloat(stats.debt) / parseFloat(stats.price)).toFixed(18));
+
+                    const tx = await contract.liquidate(address, { value: debtInEth });
+                    showNotify("Liquidation tx sent...", "info");
+                    await tx.wait();
+                    showNotify("Liquidation successful! Earned 5% bonus.", "success");
+                    logActivity("LIQUIDATION", `Liquidated vault ${address}`, tx.hash, stats.debt);
+                    updateStats(address!);
+                  } catch (err: any) {
+                    console.error("Liquidation failed", err);
+                    showNotify("Liquidation failed. Check health or balance.", "error");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="btn btn-primary"
+                style={{ background: 'var(--danger)', padding: '0.8rem 1.5rem' }}
+              >
+                Liquidate Position
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '4rem' }}>
+            <ShieldCheck size={48} className="text-success" style={{ opacity: 0.2, marginBottom: '1rem' }} />
+            <p className="text-muted">No liquidatable positions found. The system is healthy.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="glass-panel" style={{ marginTop: '2.5rem' }}>
+        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
+          <History size={20} /> SYSTEM RESOLUTION LOG (GREENFIELD AUDITED)
+        </h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {transactions.filter(t => t.type.includes('LIQ')).length === 0 ? (
+            <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>No system liquidations have occurred yet.</p>
+          ) : (
+            transactions.filter(t => t.type.includes('LIQ')).map((log, idx) => (
+              <div key={idx} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="status-badge status-error" style={{ fontSize: '0.6rem' }}>{log.type.replace('_', ' ')}</span>
+                    <span style={{ fontWeight: 600 }}>{log.address.slice(0, 8)}...</span>
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent)', marginTop: '0.4rem', display: 'flex', gap: '0.8rem' }}>
+                    {log.greenfieldCid && (
+                      <a href={`https://greenfield-sp.testnet.bnbchain.org/view/${log.greenfieldCid}`} target="_blank" rel="noreferrer" style={{ color: '#00ffcc', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        Immutable Audit <ExternalLink size={10} />
+                      </a>
+                    )}
+                    <span>{log.date}</span>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--danger)' }}>-${log.amount} USD</div>
+                  <div className="text-muted" style={{ fontSize: '0.6rem' }}>Debt Cleared</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="glass-panel" style={{ marginTop: '2rem' }}>
+        <h4 style={{ marginBottom: '1.2rem', color: 'var(--primary)' }}>How it works?</h4>
+        <div className="stat-grid">
+          <div className="glass-card">
+            <span className="label">Health Threshold</span>
+            <div className="value">1.00</div>
+            <p className="text-muted" style={{ fontSize: '0.7rem' }}>Below this, any user can liquidate you.</p>
+          </div>
+          <div className="glass-card">
+            <span className="label">Bonus Incentive</span>
+            <div className="value">5%</div>
+            <p className="text-muted" style={{ fontSize: '0.7rem' }}>Extra collateral given to the liquidator.</p>
+          </div>
+          <div className="glass-card">
+            <span className="label">PQC Verified</span>
+            <div className="value">YES</div>
+            <p className="text-muted" style={{ fontSize: '0.7rem' }}>Every liquidation event is PQC-audited.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // --- DASHBOARD VIEW ---
   return (
     <div className="container" style={{ paddingBottom: '5rem' }}>
       <NotificationToast />
+      {(!hasMandate || parseFloat(legacyCollateral) > 0) && address && (
+        <div className="glass-panel" style={{
+          background: 'linear-gradient(90deg, rgba(255, 171, 0, 0.1), rgba(255, 106, 0, 0.1))',
+          border: '1px solid #ffab00',
+          marginBottom: '2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          animation: 'pulse 2s infinite'
+        }}>
+          <div>
+            <h4 style={{ color: '#ffab00', marginBottom: '0.2rem' }}>
+              {parseFloat(legacyCollateral) > 0 ? "Legacy Assets Found" : "Legacy User Detected"}
+            </h4>
+            <p style={{ fontSize: '0.8rem', opacity: 0.8 }}>
+              {parseFloat(legacyCollateral) > 0
+                ? `You have ${legacyCollateral} tBNB in an old vault. Migrate to the new PQC standard now.`
+                : "Your vault is running on legacy security. Upgrade to Post-Quantum Mandate for protection."}
+            </p>
+          </div>
+          <button
+            onClick={parseFloat(legacyCollateral) > 0 ? migrateLegacyCollateral : handleUpgradeSecurity}
+            className="btn btn-primary"
+            style={{ background: '#ffab00', border: 'none', color: '#000' }}
+          >
+            {parseFloat(legacyCollateral) > 0 ? "Migrate & Upgrade" : "Upgrade Security Now"}
+          </button>
+        </div>
+      )}
+
       {/* Navbar */}
       <nav className="nav-bar">
         <div className="logo" onClick={() => setActiveTab('dashboard')} style={{ cursor: 'pointer' }}>
@@ -966,6 +1313,13 @@ function App() {
           >
             Audit Log
           </button>
+          <button
+            onClick={() => setActiveTab('liquidation')}
+            className={`btn ${activeTab === 'liquidation' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', border: 'none' }}
+          >
+            Liquidation
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -985,6 +1339,22 @@ function App() {
             {address?.slice(0, 6)}...{address?.slice(-4)}
           </div>
           <button
+            onClick={simulateMarketCrash}
+            className="btn btn-outline"
+            style={{ fontSize: '0.7rem', color: 'var(--danger)', padding: '0.4rem 0.6rem', borderColor: 'var(--danger)' }}
+            title="Dev Tool: Simulate Market Crash"
+          >
+            <AlertTriangle size={12} /> Crash
+          </button>
+          <button
+            onClick={simulateMarketRecovery}
+            className="btn btn-outline"
+            style={{ fontSize: '0.7rem', color: 'var(--success)', padding: '0.4rem 0.6rem', borderColor: 'var(--success)' }}
+            title="Dev Tool: Restore Market"
+          >
+            <RefreshCw size={12} /> Live
+          </button>
+          <button
             onClick={handleLogout}
             className="btn btn-outline"
             style={{ padding: '0.5rem', borderRadius: '8px' }}
@@ -999,6 +1369,7 @@ function App() {
       {activeTab === 'dashboard' && renderDashboard()}
       {activeTab === 'marketplace' && renderMarketplace()}
       {activeTab === 'security' && renderAudit()}
+      {activeTab === 'liquidation' && renderLiquidation()}
 
       <PurchaseConfirmationModal />
     </div>
