@@ -8,19 +8,19 @@ This document provides a deep dive into the technical architecture of the **BNB 
 
 ```mermaid
 graph TD
-    User((User Wallet)) -->|1. PQC Handshake| QidCloud[QidCloud PQC Enclave]
-    QidCloud -->|2. Secure Session| DApp[React Frontend]
+    User["User Wallet"] -->|1. PQC Handshake| QidCloud["QidCloud PQC Enclave"]
+    QidCloud -->|2. Secure Session| DApp["React Frontend"]
     
-    subgraph backend [Intelligent Backend Node]
-        Oracle[Binance Oracle Syncer] -->|Fetch| BinanceAPI[Binance Market Feed]
-        Guardian[Guardian Bot] -->|Monitor| RPC[opBNB RPC]
-        Indexer[Audit Indexer] -->|Store| Greenfield[BNB Greenfield Storage]
+    subgraph backend ["Intelligent Backend Node"]
+        Oracle["Binance Oracle Syncer"] -->|Fetch| BinanceAPI["Binance Market Feed"]
+        Guardian["Guardian Bot"] -->|Monitor| RPC["opBNB RPC"]
+        Indexer["Audit Indexer"] -->|Store| Greenfield["BNB Greenfield Storage"]
     end
     
-    subgraph blockchain [opBNB Execution Layer]
-        Vault[PQC Vault Contract]
-        CM[Credit Manager]
-        PriceOracle[On-Chain Price Oracle]
+    subgraph blockchain ["opBNB Execution Layer"]
+        Vault["PQCVault Contract"]
+        CM["Credit Manager"]
+        PriceOracle["On-Chain Price Oracle"]
     end
     
     DApp -->|3. Transaction| Vault
@@ -30,6 +30,20 @@ graph TD
     Guardian -->|4. Auto-Liquidation| CM
     CM -->|Audit Event| Indexer
 ```
+
+> [!NOTE]
+> **Visual Preview (If graph doesn't load):**
+> ```text
+> [ User Wallet ] ----> ( PQC Enclave ) ----> [ React Frontend ]
+>                                                   |
+>        ___________________________________________|
+>       |                |                          |
+> [ opBNB Vault ] <-> [ Credit Manager ] <--- [ Binance Oracle ]
+>       |                         ^                 |
+>       |_________________________|_________________|
+>                                 |
+>                         [ Greenfield Audit ]
+> ```
 
 ---
 
@@ -74,17 +88,17 @@ The `Guardian Bot` is a 24/7 "Keeper". It continuously iterates through all acti
 
 ```mermaid
 graph LR
-    subgraph UserSpace [User Identity]
-        Sig[ML-DSA Signature]
+    subgraph UserSpace ["User Identity"]
+        Sig["ML-DSA Signature"]
     end
     
-    subgraph Execution [opBNB Layer]
-        Vault[(PQCVault)]
-        CM[Credit Manager]
+    subgraph Execution ["opBNB Layer"]
+        Vault[("PQCVault")]
+        CM["Credit Manager"]
     end
     
-    subgraph Persistence [Greenfield Layer]
-        Log{{Immutable Audit}}
+    subgraph Persistence ["Greenfield Layer"]
+        Log{{"Immutable Audit"}}
     end
     
     UserSpace -->|1. Sign Mandate| Vault
@@ -93,6 +107,20 @@ graph LR
     Vault -->|4. Anchor Proof| Log
     Log -.->|5. Public Evidence| UserSpace
 ```
+
+> [!TIP]
+> **Data Flow Logic:**
+> ```text
+> [ User Enclave ] --(1. PQC Sign)--> [ opBNB Vault ]
+>                                         |
+>                                (2. Verify Health)
+>                                         |
+>                                   [ Credit Manager ]
+>                                         |
+>                                 (3. Finalize Tx)
+>                                         |
+> [ Greenfield Storage ] <--(4. Anchor Log)--'
+> ```
 
 ### Detailed Data Flow Description
 1.  **Authorization**: The user generates a Post-Quantum signature in their biometric enclave.

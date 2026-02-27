@@ -24,6 +24,15 @@ As quantum computing approaches, traditional blockchain security is at risk. Our
 *   **Risk Analysis:** Node.js + BscScan V2 Reputation Scoring.
 *   **Frontend:** React (Vite) + Lucide + Glassmorphism / Neon UI.
 
+### 🗺️ The Protocol Trinity
+```text
+   [ QidCloud PQC ]  <-- Auth & Session Security
+          |
+   [  opBNB Layer  ]  <-- Fast Credit & Settlements
+          |
+   [ BNB Greenfield ] <-- Immutable Audit & Proofs
+```
+
 ## 📖 Documentation & Guides
 
 Explore our comprehensive technical and user guides in the [**/docs**](./docs/README.md) folder:

@@ -27,11 +27,11 @@ All contracts are deployed on **opBNB Testnet (ChainID: 5611)**.
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant Q as QidCloud (PQC Enclave)
-    participant F as Frontend (opBNB DApp)
-    participant V as PQCVault (opBNB)
-    participant G as BNB Greenfield
+    participant U as "User"
+    participant Q as "QidCloud (PQC Enclave)"
+    participant F as "Frontend (opBNB DApp)"
+    participant V as "PQCVault (opBNB)"
+    participant G as "BNB Greenfield"
 
     U->>F: 1. Connect Wallet & Auth
     F->>Q: 2. Biometric Handshake
@@ -45,6 +45,14 @@ sequenceDiagram
     V-->>G: 10. Anchor Audit Log
     Note over U,G: Quantum-Secure Lifecycle Complete
 ```
+
+> [!TIP]
+> **User Journey Flow:**
+> 1. **Auth:** User --(Biometrics)--> QidCloud (PQC Session)
+> 2. **Stake:** User --(tBNB)--> opBNB Vault (Collateral Locked)
+> 3. **Verify:** Vault --(Signed JSON)--> Greenfield (Audit Trail)
+> 4. **Spend:** User --(One-Click)--> Marketplace (Auto-Borrow Logic)
+> 5. **Sync:** Credit Manager --(vUSD)--> Seller (Atomic Settlement)
 
 ---
 
