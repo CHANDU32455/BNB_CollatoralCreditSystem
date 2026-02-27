@@ -70,13 +70,36 @@ The `Guardian Bot` is a 24/7 "Keeper". It continuously iterates through all acti
 
 ---
 
-## 📊 Data Flow: A "Seamless Spend" Event
+## 🔄 Lifecycle Data Flow: "The Credit Loop"
 
-1.  **Trigger:** User clicks "Authorize" in the Marketplace.
-2.  **Logic:** The Frontend calculates `(Cost - Balance)`. If the user is short, it prepares an **Auto-Borrow** transaction.
-3.  **Sign:** The **QidCloud SDK** prompts for a PQC session confirmation.
-4.  **Execute:** The transaction hits **opBNB**, locking collateral and issuing credit in a single block.
-5.  **Persist:** The result is indexed in our backend and a summary is anchored to **Greenfield** for the user's permanent audit trail.
+```mermaid
+graph LR
+    subgraph UserSpace [User Identity]
+        Sig[ML-DSA Signature]
+    end
+    
+    subgraph Execution [opBNB Layer]
+        Vault[(PQCVault)]
+        CM[Credit Manager]
+    end
+    
+    subgraph Persistence [Greenfield Layer]
+        Log{{Immutable Audit}}
+    end
+    
+    UserSpace -->|1. Sign Mandate| Vault
+    Vault -->|2. Risk Sync| CM
+    CM -->|3. Health Verification| Vault
+    Vault -->|4. Anchor Proof| Log
+    Log -.->|5. Public Evidence| UserSpace
+```
+
+### Detailed Data Flow Description
+1.  **Authorization**: The user generates a Post-Quantum signature in their biometric enclave.
+2.  **Vault Interaction**: The `PQCVault` receives the transaction and pulls real-time BNB/USD price data from the `PriceOracle`.
+3.  **Credit Check**: `CreditManager` verifies the LTV (Loan-to-Value) ratio. If the user has a high "Trust Score" (indexed from BscScan reputation), they get a 5-10% LTV bonus.
+4.  **Logging**: Once the transaction is finalized on opBNB, the backend retrieves the TxHash and anchors a signed JSON record to **BNB Greenfield**.
+5.  **Audit**: The user can click any "Proof" link in the frontend to fetch the raw JSON from Greenfield, serving as mathematical proof of the credit event.
 
 ---
 

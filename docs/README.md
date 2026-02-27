@@ -20,6 +20,12 @@ Welcome to the official documentation for the **BNB Collateral Credit System**. 
 *   Feature roadmap and hackathon completion checklist.
 *   Project milestones and success metrics.
 
+### [🏆 Hackathon Submission Guide](./SUBMISSION.md)
+*   **Essential Links**: Tweet/X link and Demo Video.
+*   **Contract Ledger**: opBNB Testnet addresses for verification.
+*   **Future Planning**: Our dedicated 6-month roadmap and post-hackathon vision.
+*   **Notes for Judges**: Highlighting QidCloud PQC and Greenfield integration.
+
 ### [🎙️ Pitch & Demo Script](./Pitch_Script.md)
 *   A structured narrative for a 3–5 minute presentation.
 *   Key speaking points and technical value propositions.

@@ -50,21 +50,26 @@ cd ../contracts && npm install
 ## 🏗️ Running the Components
 
 ### **A. Backend (Risk Engine & Guardian Bot)**
-The backend simulates the Price Oracle and runs the autonomous liquidation bot.
+The backend acts as the protocol's brain—syncing prices and running the liquidation Keeper.
 ```bash
 cd backend
+npm install
 npm run dev
 ```
-*   **Port:** `3001`
-*   **Key Feature:** Watch the terminal for "[Oracle] Syncing market" logs.
+*   **Port:** `3001` (Ensure this port is free, as the frontend expects it).
+*   **Logs to Watch:** 
+    *   `[Oracle] Syncing market...` (Confirms real-time price feed is active).
+    *   `[Keeper] Guardian Active...` (Confirms the search for unhealthy vaults has started).
 
-### **B. Frontend (React Dashboard)**
-The premium user interface for managing credit and marketplace purchases.
+### **B. Frontend (The "Premium" DApp)**
+The visual interface for users and the Guardian Control Panel.
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 *   **URL:** `http://localhost:5173`
+*   **Connection:** The frontend will auto-detect the backend on `localhost:3001`.
 *   **Network:** Ensure MetaMask is set to **opBNB Testnet**.
 
 ---
