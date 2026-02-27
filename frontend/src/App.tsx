@@ -1035,7 +1035,7 @@ function App() {
                           )}
                           {tx.greenfieldCid && (
                             <a
-                              href={`https://greenfield-sp.testnet.bnbchain.org/view/${tx.greenfieldCid}`}
+                              href={`https://testnet.greenfieldscan.com/object/${tx.greenfieldCid}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: '#00ffcc', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}
@@ -1209,7 +1209,7 @@ function App() {
                   </div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--accent)', marginTop: '0.4rem', display: 'flex', gap: '0.8rem' }}>
                     {log.greenfieldCid && (
-                      <a href={`https://greenfield-sp.testnet.bnbchain.org/view/${log.greenfieldCid}`} target="_blank" rel="noreferrer" style={{ color: '#00ffcc', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <a href={`https://testnet.greenfieldscan.com/object/${log.greenfieldCid}`} target="_blank" rel="noreferrer" style={{ color: '#00ffcc', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                         Immutable Audit <ExternalLink size={10} />
                       </a>
                     )}
