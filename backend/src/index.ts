@@ -200,31 +200,6 @@ app.get("/api/vault/mandate-status/:address", (req, res) => {
     });
 });
 
-app.post("/api/simulate/crash", async (req, res) => {
-    let privateKey = process.env.GUARDIAN_PRIVATE_KEY || "";
-    if (privateKey && !privateKey.startsWith("0x")) privateKey = "0x" + privateKey;
-    if (!privateKey) return res.status(500).json({ error: "Guardian key missing" });
-
-    try {
-        isManualOverride = true; // Stop the real-time syncer
-        const wallet = new ethers.Wallet(privateKey, provider);
-        const oracle = new ethers.Contract(PRICE_ORACLE_ADDRESS, ["function setPrice(int256) external"], wallet);
-
-        const tx = await oracle.setPrice(20000000000n); // $200
-        await tx.wait();
-
-        console.log(`[Simulator] Manual CRASH active: $200`);
-        res.json({ success: true, txHash: tx.hash });
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.post("/api/simulate/recover", async (req, res) => {
-    isManualOverride = false; // Resume real-time syncer
-    res.json({ success: true, message: "Real-time pricing resumed." });
-});
-
 // --- REAL-TIME PRICE SYNCER (BNB/USDT) ---
 let isManualOverride = false;
 let isSyncingPrice = false;
@@ -272,6 +247,33 @@ const syncRealPrice = async () => {
 // Initial sync and then every 60s
 syncRealPrice();
 setInterval(syncRealPrice, 60000);
+
+app.post("/api/simulate/crash", async (req, res) => {
+    let privateKey = process.env.GUARDIAN_PRIVATE_KEY || "";
+    if (privateKey && !privateKey.startsWith("0x")) privateKey = "0x" + privateKey;
+    if (!privateKey) return res.status(500).json({ error: "Guardian key missing" });
+
+    try {
+        isManualOverride = true; // Stop the real-time syncer
+        const wallet = new ethers.Wallet(privateKey, provider);
+        const oracle = new ethers.Contract(PRICE_ORACLE_ADDRESS, ["function setPrice(int256) external"], wallet);
+
+        const tx = await oracle.setPrice(20000000000n); // $200
+        await tx.wait();
+
+        console.log(`[Simulator] Manual CRASH active: $200`);
+        res.json({ success: true, txHash: tx.hash });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post("/api/simulate/recover", async (req, res) => {
+    isManualOverride = false; // Resume real-time syncer
+    lastSyncedPrice = 0; // Force sync to the real price!
+    await syncRealPrice();
+    res.json({ success: true, message: "Real-time pricing resumed." });
+});
 
 app.post("/api/activity/log", async (req, res) => {
     const { type, address, details, txHash, amount } = req.body;
