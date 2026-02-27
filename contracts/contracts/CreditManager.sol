@@ -124,12 +124,17 @@ contract CreditManager is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Withdraw collateral — only if debt is fully repaid (handled by vault)
+     * @dev Withdraw collateral — only if debt is fully repaid.
+     *      Uses withdrawToLiquidator helper to correctly route from user's vault to user's wallet.
      */
     function withdrawCollateral(uint256 amount) external nonReentrant {
         ( , uint256 debt, ) = vault.vaults(msg.sender);
         require(debt == 0, "CreditManager: Repay all debt first");
-        vault.withdrawCollateral(amount);
+        
+        // FIX: Tell vault to transfer from user's balance to user's wallet
+        // borrower = msg.sender, liquidator = msg.sender
+        vault.withdrawToLiquidator(msg.sender, msg.sender, amount);
+        
         emit CollateralWithdrawn(msg.sender, amount);
     }
 
