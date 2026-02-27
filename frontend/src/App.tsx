@@ -293,9 +293,13 @@ function App() {
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
 
+      // Fix for "nonce too low": Explicitly fetch the next nonce including pending transactions
+      const currentNonce = await provider.getTransactionCount(address, "pending");
+
       const tx = await signer.sendTransaction({
         to: VAULT_ADDRESS,
-        value: ethers.parseEther(depositAmount)
+        value: ethers.parseEther(depositAmount),
+        nonce: currentNonce
       });
 
       showNotify("Transaction submitted. Waiting for block...", "info");
@@ -307,11 +311,15 @@ function App() {
       showNotify(`Successfully deposited ${depositAmount} tBNB!`, "success");
     } catch (err: any) {
       console.error("Deposit failed", err);
+      const errMsg = err?.message || "";
       if (err.code === 'ACTION_REJECTED') {
         showNotify("Transaction cancelled by user", "info");
+      } else if (errMsg.includes("nonce") || errMsg.includes("too low")) {
+        showNotify("Nonce error: please reset your MetaMask account in Advanced Settings.", "error");
+        logActivity("ERROR", `Nonce Desync: ${errMsg}`);
       } else {
         showNotify("Deposit failed. Check network status.", "error");
-        logActivity("ERROR", `Deposit failed: ${err.message}`);
+        logActivity("ERROR", `Deposit failed: ${errMsg}`);
       }
     } finally {
       setIsDepositLoading(false);
@@ -381,14 +389,20 @@ function App() {
       // Step 1: Approve vUSD spend by CreditManager
       const VUSD_ABI = ["function approve(address, uint256) returns (bool)", "function allowance(address, address) view returns (uint256)"];
       const vUsdContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, VUSD_ABI, signer);
-      showNotify("Approving vUSD spend...", "info");
+
+      showNotify("Step 1/2: Approving vUSD spend...", "info");
       const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei);
+      showNotify("Waiting for approval confirmation...", "info");
       await approveTx.wait();
 
       // Step 2: Call repay
+      // We fetch the latest nonce to ensure we don't hit "replacement fee too low"
+      const nextNonce = await provider.getTransactionCount(address!, "pending");
       const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
-      showNotify("Repaying debt on-chain...", "info");
-      const tx = await creditContract.repay(amountWei);
+
+      showNotify("Step 2/2: Repaying debt on-chain...", "info");
+      const tx = await creditContract.repay(amountWei, { nonce: nextNonce });
+      showNotify("Repay submitted. Finalizing...", "info");
       await tx.wait();
 
       setRepayAmount('');
@@ -397,8 +411,16 @@ function App() {
       showNotify(`✅ $${repayAmount} debt repaid successfully!`, "success");
     } catch (err: any) {
       console.error("Repay failed", err);
-      showNotify(err?.reason || "Repay failed", "error");
-      logActivity("ERROR", `Repay failed: ${err.message}`);
+      const errMsg = err?.message || "";
+      if (err.code === 'ACTION_REJECTED') {
+        showNotify("Cancelled by user", "info");
+      } else if (errMsg.includes("replacement") || errMsg.includes("underpriced") || errMsg.includes("nonce")) {
+        showNotify("Nonce Desync: Please 'Reset Account' in MetaMask Advanced Settings.", "error");
+        logActivity("ERROR", `Repay Nonce Error: ${errMsg}`);
+      } else {
+        showNotify(err?.reason || "Repay failed", "error");
+        logActivity("ERROR", `Repay failed: ${errMsg}`);
+      }
     } finally {
       setIsRepayLoading(false);
     }
@@ -416,16 +438,28 @@ function App() {
     try {
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
+
+      const currentNonce = await provider.getTransactionCount(address!, "pending");
       const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
       const collateralWei = ethers.parseEther(stats.collateral);
-      const tx = await creditContract.withdrawCollateral(collateralWei);
+
+      showNotify("Withdrawing collateral...", "info");
+      const tx = await creditContract.withdrawCollateral(collateralWei, { nonce: currentNonce });
       await tx.wait();
+
       if (address) updateStats(address);
       logActivity("WITHDRAW", `Withdrew ${stats.collateral} tBNB collateral`, tx.hash, stats.collateral);
       showNotify(`✅ ${stats.collateral} tBNB withdrawn!`, "success");
     } catch (err: any) {
       console.error("Withdraw failed", err);
-      showNotify(err?.reason || "Withdraw failed", "error");
+      const errMsg = err?.message || "";
+      if (err.code === 'ACTION_REJECTED') {
+        showNotify("Cancelled by user", "info");
+      } else if (errMsg.includes("nonce") || errMsg.includes("too low")) {
+        showNotify("Nonce Desync: Please 'Reset Account' in MetaMask Advanced Settings.", "error");
+      } else {
+        showNotify(err?.reason || "Withdraw failed", "error");
+      }
     } finally {
       setIsWithdrawLoading(false);
     }
