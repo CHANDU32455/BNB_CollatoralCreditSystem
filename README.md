@@ -24,9 +24,14 @@ As quantum computing approaches, traditional blockchain security is at risk. Our
 *   **Risk Analysis:** Node.js + BscScan V2 Reputation Scoring.
 *   **Frontend:** React (Vite) + Lucide + Glassmorphism / Neon UI.
 
-## 📖 Documentation
-*   [**Hackathon Guide**](./HACKATHON_GUIDE.md) - Deep dive into architecture, lessons learned, and setup.
-*   [**Presentation Script**](./PRESENTATION_SCRIPT.md) - The ultimate guide on how to pitch and demo this project.
+## 📖 Documentation & Guides
+
+Explore our comprehensive technical and user guides in the [**/docs**](./docs/README.md) folder:
+
+*   [**🏗️ Architecture Deep-Dive**](./docs/Architecture.md) - How opBNB, Greenfield, and PQC work together.
+*   [**🛠️ Setup & Development**](./docs/Setup.md) - Get the system running locally in 5 minutes.
+*   [**🚀 Implementation Plan**](./docs/Implementation_Plan.md) - Feature roadmap and technical milestones.
+*   [**🎙️ Pitch & Demo Script**](./docs/Pitch_Script.md) - How to present the project to judges.
 
 ## 🏁 Quick Start
 1.  **Backend:** `cd backend && npm install && npm run dev` (Starts the Guardian Bot + Oracle Syncer)
