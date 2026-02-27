@@ -1035,12 +1035,13 @@ function App() {
                           )}
                           {tx.greenfieldCid && (
                             <a
-                              href={`https://testnet.greenfieldscan.com/object/${tx.greenfieldCid}`}
+                              href={tx.greenfieldCid.startsWith('http') ? tx.greenfieldCid : `https://testnet.greenfieldscan.com/object?bucket_name=bnbvault-pqc-audit&object_name=${tx.greenfieldCid}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: '#00ffcc', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}
+                              title={`View on Greenfield: ${tx.greenfieldCid}`}
                             >
-                              Greenfield Log <ExternalLink size={10} />
+                              🌿 Greenfield Log <ExternalLink size={10} />
                             </a>
                           )}
                         </div>
@@ -1052,8 +1053,8 @@ function App() {
                     <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>
                       {['Deposit', 'MIGRATION'].includes(tx.type) ? '' : '$'}{tx.amount} {['Deposit', 'MIGRATION'].includes(tx.type) ? 'tBNB' : 'USD'}
                     </div>
-                    <div className={`status-badge ${tx.greenfieldCid ? 'status-success' : 'status-warning'}`} style={{ fontSize: '0.6rem', marginTop: '0.3rem', background: tx.greenfieldCid ? 'rgba(0, 255, 204, 0.1)' : '' }}>
-                      {tx.greenfieldCid ? 'Anchored to Greenfield' : 'PQC Verified'}
+                    <div className={`status-badge ${tx.greenfieldCid ? 'status-success' : 'status-warning'}`} style={{ fontSize: '0.6rem', marginTop: '0.3rem', background: tx.greenfieldCid ? 'rgba(0, 255, 204, 0.1)' : '' }} title={tx.greenfieldCid || ''}>
+                      {tx.greenfieldCid ? '🌿 On Greenfield' : 'PQC Verified'}
                     </div>
                   </div>
                 </div>

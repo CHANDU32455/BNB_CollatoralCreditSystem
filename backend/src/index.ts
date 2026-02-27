@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import { QidCloud } from "@qidcloud/sdk";
 import axios from "axios";
 import fs from "fs";
+import { anchorAuditLog, ensureBucketExists, BUCKET_NAME } from "./greenfield";
 
 dotenv.config({ path: "../.env" });
 
@@ -288,27 +289,17 @@ app.post("/api/activity/log", async (req, res) => {
         history.push(logEntry);
         fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
-        // 2. REAL PERMANENCE: Anchor to BNB Greenfield
-        // We only anchor critical financial events to save on costs/bandwidth for the demo
+        // 2. REAL PERMANENCE: Anchor directly to BNB Greenfield via official SDK
         if (["AUTO_LIQUIDATION", "BORROW", "DEPOSIT", "UPGRADE"].includes(type)) {
-            console.log(`[Greenfield] Anchoring immutable ${type} record...`);
-            const blob = new Blob([JSON.stringify(logEntry)], { type: 'application/json' });
-
-            const uploadResponse = await qid.vault.upload(
-                blob,
-                `audit_${type.toLowerCase()}_${address.slice(0, 6)}_${Date.now()}.json`,
-                {
-                    userAddress: address,
-                    type: 'AUDIT_LOG',
-                    event: type
-                }
-            );
-            console.log(`[Greenfield] Log secured. CID: ${uploadResponse.file.id}`);
-
-            // Link the CID to the local record for the UI link
-            const lastIdx = history.length - 1;
-            history[lastIdx].greenfieldCid = uploadResponse.file.id;
-            fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
+            const gfResult = await anchorAuditLog(type, address, logEntry);
+            if (gfResult) {
+                // Store the real Greenfield scan URL as the CID reference
+                const lastIdx = history.length - 1;
+                history[lastIdx].greenfieldCid = gfResult.scanUrl;
+                history[lastIdx].greenfieldObject = gfResult.objectName;
+                fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
+                console.log(`[Greenfield] ✅ Anchored: ${gfResult.scanUrl}`);
+            }
         }
     } catch (e: any) {
         console.error("Failed to persist to Greenfield:", e.message);
@@ -416,21 +407,22 @@ const startLiquidationKeeper = () => {
                                 timestamp: new Date().toISOString()
                             };
 
-                            // Anchor to Greenfield
+                            // Anchor directly to BNB Greenfield
                             console.log(`[Greenfield] Anchoring liquidation audit for ${addr}...`);
-                            const blob = new Blob([JSON.stringify(logEntry)], { type: 'application/json' });
-                            const upResp = await qid.vault.upload(blob, `liq_${addr.toLowerCase()}_${Date.now()}.json`, {
-                                userAddress: addr,
-                                type: 'AUDIT_LOG',
-                                event: 'AUTO_LIQUIDATION'
-                            });
+                            const gfResult = await anchorAuditLog("AUTO_LIQUIDATION", addr, logEntry);
 
-                            // Save with CID
+                            // Save with real Greenfield scan URL
                             const updatedHistory = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf-8"));
-                            updatedHistory.push({ ...logEntry, greenfieldCid: upResp.file.id });
+                            updatedHistory.push({
+                                ...logEntry,
+                                greenfieldCid: gfResult?.scanUrl || null,
+                                greenfieldObject: gfResult?.objectName || null,
+                            });
                             fs.writeFileSync(HISTORY_PATH, JSON.stringify(updatedHistory, null, 2));
 
-                            console.log(`[Greenfield] Liquidation record anchored: ${upResp.file.id}`);
+                            if (gfResult) {
+                                console.log(`[Greenfield] ✅ Liquidation record anchored: ${gfResult.scanUrl}`);
+                            }
                         } catch (err: any) {
                             console.error(`[Keeper] Liquidation failed for ${addr}:`, err.message);
                         } finally {
@@ -482,5 +474,7 @@ const startLiquidationMonitor = () => {
 
 app.listen(PORT, () => {
     console.log(`Risk Engine running on http://localhost:${PORT}`);
+    // Bootstrap Greenfield bucket on startup (non-blocking)
+    ensureBucketExists().catch(e => console.error('[Greenfield] Startup bucket check failed:', e.message));
     startLiquidationKeeper();
 });
