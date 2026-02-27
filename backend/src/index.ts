@@ -36,9 +36,9 @@ const qid = new QidCloud({
 const provider = new ethers.JsonRpcProvider("https://opbnb-testnet-rpc.bnbchain.org");
 
 // Contract Addresses (Deployed 2026-02-25)
-const VAULT_ADDRESS = "0x8B024C7fF8337634059133f709C54375ac5536d9";
-const CREDIT_MANAGER_ADDRESS = "0xB4Cfff43ABCB78bb6EAaFA45272B9EB50dB8EB55";
-const PRICE_ORACLE_ADDRESS = "0xc120F72D5fEd63a492042033a80c8f30D5862872";
+const VAULT_ADDRESS = process.env.VITE_VAULT_ADDRESS!;
+const CREDIT_MANAGER_ADDRESS = process.env.VITE_CREDIT_MANAGER_ADDRESS!;
+const PRICE_ORACLE_ADDRESS = process.env.VITE_PRICE_ORACLE_ADDRESS!;
 
 // --- Endpoints ---
 

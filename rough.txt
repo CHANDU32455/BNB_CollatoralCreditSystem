@@ -10,3 +10,9 @@ Deployment completed successfully!
 
 
 
+Pass Rate: 100% (4/4 tests passed)
+
+ Collateral Deposit: Verified users can lock tBNB securely.
+ Borrow Capacity: Confirmed the 70% LTV (Loan-to-Value) calculation is accurate.
+ vUSD Issuance: Verified the CreditManager correctly mints credit tokens.
+ Liquidation Logic: Confirmed that when a "Market Crash" happens, the Guardian Bot can successfully liquidate underwater positions and recover the system health.
