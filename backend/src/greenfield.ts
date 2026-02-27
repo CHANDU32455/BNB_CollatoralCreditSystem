@@ -113,9 +113,25 @@ export async function uploadAuditToGreenfield(
             throw new Error(`SP error ${res.statusCode}: ${res.message}`);
         }
 
-        const scanUrl = `https://testnet.greenfieldscan.com/object?object_name=${encodeURIComponent(objectName)}&bucket_name=${BUCKET_NAME}`;
-        console.log(`[Greenfield] ✅ Anchored → ${scanUrl}`);
+        // After upload, fetch the on-chain object metadata to get its real hex ID
+        // Greenfield Scan uses hex IDs: /object/0x000...001d4ebb  — NOT query params
+        let scanUrl: string;
+        try {
+            const head = await client.object.headObject(BUCKET_NAME, objectName);
+            const rawId = head?.objectInfo?.id ?? head?.objectInfo?.Id;
+            if (rawId !== undefined && rawId !== null) {
+                // Convert decimal ID to zero-padded 32-byte hex
+                const hexId = "0x" + BigInt(rawId.toString()).toString(16).padStart(64, "0");
+                scanUrl = `https://testnet.greenfieldscan.com/object/${hexId}`;
+            } else {
+                throw new Error("no ID in headObject response");
+            }
+        } catch {
+            // Fallback: DCellar testnet supports bucket/object name navigation
+            scanUrl = `https://testnet.dcellar.io/buckets/${BUCKET_NAME}/objects/${encodeURIComponent(objectName)}`;
+        }
 
+        console.log(`[Greenfield] ✅ Anchored → ${scanUrl}`);
         return { objectName, bucketName: BUCKET_NAME, scanUrl };
     } catch (err: any) {
         console.error(`[Greenfield] ❌ Upload failed for "${objectName}": ${err?.message}`);

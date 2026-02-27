@@ -290,7 +290,7 @@ app.post("/api/activity/log", async (req, res) => {
         fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
         // 2. REAL PERMANENCE: Anchor directly to BNB Greenfield via official SDK
-        if (["AUTO_LIQUIDATION", "BORROW", "DEPOSIT", "UPGRADE"].includes(type)) {
+        if (["AUTO_LIQUIDATION", "BORROW", "DEPOSIT", "UPGRADE", "REPAY", "WITHDRAW"].includes(type)) {
             const gfResult = await anchorAuditLog(type, address, logEntry);
             if (gfResult) {
                 // Store the real Greenfield scan URL as the CID reference

@@ -45,10 +45,15 @@ const VAULT_ABI = [
 
 const CREDIT_ABI = [
   "function borrow(uint256 amount) external",
+  "function repay(uint256 amountUsd) external",
+  "function withdrawCollateral(uint256 amount) external",
   "function getHealthFactor(address user) public view returns (uint256)",
+  "function getBorrowCapacity(address user) public view returns (uint256)",
   "function getLatestPrice() public view returns (int256)",
   "function liquidate(address borrower) external payable",
-  "event CreditIssued(address indexed user, uint256 amount)"
+  "event CreditIssued(address indexed user, uint256 amount)",
+  "event DebtRepaid(address indexed user, uint256 amount, uint256 remainingDebt)",
+  "event CollateralWithdrawn(address indexed user, uint256 amount)"
 ];
 
 function App() {
@@ -56,6 +61,9 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('vault_isLoggedIn') === 'true');
   const [isDepositLoading, setIsDepositLoading] = useState(false);
   const [isBorrowLoading, setIsBorrowLoading] = useState(false);
+  const [isRepayLoading, setIsRepayLoading] = useState(false);
+  const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
+  const [repayAmount, setRepayAmount] = useState('');
   const [loading, setLoading] = useState(false); // Used for general auth/init
   const [pqcSecured, setPqcSecured] = useState(localStorage.getItem('vault_pqcSecured') === 'true');
   const [pqcToken, setPqcToken] = useState<string | null>(localStorage.getItem('vault_pqcToken'));
@@ -350,6 +358,76 @@ function App() {
       }
     } finally {
       setIsBorrowLoading(false);
+    }
+  };
+
+  const repayDebt = async () => {
+    if (!repayAmount || parseFloat(repayAmount) <= 0) {
+      showNotify("Enter a valid repay amount", "error"); return;
+    }
+    const amount = parseFloat(repayAmount);
+    if (amount > parseFloat(stats.debt)) {
+      showNotify(`Cannot repay more than debt ($${stats.debt})`, "error"); return;
+    }
+    if (amount > parseFloat(stats.creditBalance)) {
+      showNotify(`Insufficient vUSD balance ($${stats.creditBalance})`, "error"); return;
+    }
+    setIsRepayLoading(true);
+    try {
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const amountWei = ethers.parseEther(repayAmount);
+
+      // Step 1: Approve vUSD spend by CreditManager
+      const VUSD_ABI = ["function approve(address, uint256) returns (bool)", "function allowance(address, address) view returns (uint256)"];
+      const vUsdContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, VUSD_ABI, signer);
+      showNotify("Approving vUSD spend...", "info");
+      const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei);
+      await approveTx.wait();
+
+      // Step 2: Call repay
+      const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
+      showNotify("Repaying debt on-chain...", "info");
+      const tx = await creditContract.repay(amountWei);
+      await tx.wait();
+
+      setRepayAmount('');
+      if (address) updateStats(address);
+      logActivity("REPAY", `Repaid $${repayAmount} USD debt`, tx.hash, repayAmount);
+      showNotify(`✅ $${repayAmount} debt repaid successfully!`, "success");
+    } catch (err: any) {
+      console.error("Repay failed", err);
+      showNotify(err?.reason || "Repay failed", "error");
+      logActivity("ERROR", `Repay failed: ${err.message}`);
+    } finally {
+      setIsRepayLoading(false);
+    }
+  };
+
+  const withdrawCollateralFn = async () => {
+    if (!address) return;
+    if (parseFloat(stats.debt) > 0) {
+      showNotify(`Repay your full debt ($${stats.debt}) first`, "error"); return;
+    }
+    if (parseFloat(stats.collateral) <= 0) {
+      showNotify("No collateral to withdraw", "error"); return;
+    }
+    setIsWithdrawLoading(true);
+    try {
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
+      const collateralWei = ethers.parseEther(stats.collateral);
+      const tx = await creditContract.withdrawCollateral(collateralWei);
+      await tx.wait();
+      if (address) updateStats(address);
+      logActivity("WITHDRAW", `Withdrew ${stats.collateral} tBNB collateral`, tx.hash, stats.collateral);
+      showNotify(`✅ ${stats.collateral} tBNB withdrawn!`, "success");
+    } catch (err: any) {
+      console.error("Withdraw failed", err);
+      showNotify(err?.reason || "Withdraw failed", "error");
+    } finally {
+      setIsWithdrawLoading(false);
     }
   };
 
@@ -895,6 +973,109 @@ function App() {
             </button>
           </div>
         </div>
+
+        {/* ── Health Factor Gauge ── */}
+        {parseFloat(stats.debt) > 0 && (() => {
+          const hf = parseFloat(healthFactor);
+          const hfClamped = Math.min(hf, 3.0);
+          const pct = Math.min((hfClamped / 3.0) * 100, 100);
+          const color = hf < 1.0 ? 'var(--danger)' : hf < 1.25 ? '#f59e0b' : 'var(--success)';
+          const label = hf < 1.0 ? '🔴 LIQUIDATABLE' : hf < 1.25 ? '🟡 AT RISK' : '🟢 HEALTHY';
+          return (
+            <div className="glass-panel" style={{ border: `1px solid ${color}`, background: `linear-gradient(135deg, ${color}10, transparent)` }}>
+              <h3 style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', color }}>
+                <ShieldCheck size={20} /> Health Factor
+              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Position Safety</span>
+                <span style={{ fontWeight: 800, fontSize: '1.5rem', color }}>{hf >= 100 ? '∞' : hf.toFixed(2)}</span>
+              </div>
+              <div style={{ height: '10px', background: 'rgba(255,255,255,0.08)', borderRadius: '99px', overflow: 'hidden', marginBottom: '0.6rem' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px', transition: 'width 0.6s ease', boxShadow: `0 0 8px ${color}` }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                <span>0 (Liquidated)</span>
+                <span style={{ fontWeight: 700, color }}>{label}</span>
+                <span>3.0+ (Safe)</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Repay Debt Panel ── */}
+        {parseFloat(stats.debt) > 0 && (
+          <div className="glass-panel" style={{ border: '1px solid var(--success)', background: 'linear-gradient(135deg, rgba(34,197,94,0.05), transparent)' }}>
+            <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--success)' }}>
+              <ArrowUpCircle size={20} /> Repay Debt
+            </h3>
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <span className="label">Outstanding Debt</span>
+                <span style={{ color: 'var(--danger)', fontWeight: 700 }}>${stats.debt} vUSD</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <span className="label">vUSD Balance</span>
+                <span style={{ color: 'var(--success)', fontWeight: 700 }}>${stats.creditBalance} vUSD</span>
+              </div>
+              <span className="label">Repay Amount (USD)</span>
+              <input
+                type="number"
+                className="custom-input"
+                placeholder="0.00"
+                value={repayAmount}
+                onChange={(e) => setRepayAmount(e.target.value)}
+                style={{ fontSize: '1.25rem', padding: '1rem', marginBottom: '0.5rem' }}
+              />
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                {['25', '50', '75', '100'].map(pct => (
+                  <button key={pct} onClick={() => setRepayAmount((parseFloat(stats.debt) * parseInt(pct) / 100).toFixed(4))}
+                    style={{ flex: 1, padding: '0.4rem', background: 'rgba(34,197,94,0.1)', border: '1px solid var(--success)', borderRadius: '8px', color: 'var(--success)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={repayDebt}
+                disabled={isRepayLoading}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '1rem', justifyContent: 'center', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+              >
+                {isRepayLoading ? <RefreshCw className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
+                {isRepayLoading ? "Processing..." : "Repay Debt"}
+              </button>
+              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.75rem', textAlign: 'center' }}>
+                Requires MetaMask approval to spend vUSD
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Withdraw Collateral Panel ── */}
+        {parseFloat(stats.debt) === 0 && parseFloat(stats.collateral) > 0 && (
+          <div className="glass-panel" style={{ border: '1px solid var(--accent)', background: 'linear-gradient(135deg, rgba(189,0,255,0.05), transparent)' }}>
+            <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--accent)' }}>
+              <Wallet size={20} /> Withdraw Collateral
+            </h3>
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+              <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid var(--success)', borderRadius: '12px', padding: '1rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: 600 }}>✅ Debt fully repaid — collateral unlocked!</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <span className="label">Available Collateral</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{stats.collateral} tBNB</span>
+              </div>
+              <button
+                onClick={withdrawCollateralFn}
+                disabled={isWithdrawLoading}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '1rem', justifyContent: 'center', background: 'linear-gradient(135deg, var(--accent), #7c3aed)' }}
+              >
+                {isWithdrawLoading ? <RefreshCw className="animate-spin" size={20} /> : <Wallet size={20} />}
+                {isWithdrawLoading ? "Withdrawing..." : `Withdraw ${stats.collateral} tBNB`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

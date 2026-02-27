@@ -7,6 +7,10 @@ import "./PQCVault.sol";
 
 interface IVaultUSD {
     function mint(address to, uint256 amount) external;
+    function burn(address from, uint256 amount) external;
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
 }
 
 interface AggregatorV3Interface {
@@ -19,7 +23,7 @@ interface AggregatorV3Interface {
 
 /**
  * @title CreditManager
- * @dev Manages borrowing logic and health factor calculations.
+ * @dev Manages borrowing, repayment, and liquidation logic.
  */
 contract CreditManager is ReentrancyGuard, Ownable {
     PQCVault public vault;
@@ -34,7 +38,8 @@ contract CreditManager is ReentrancyGuard, Ownable {
     uint256 public constant BPS_DIVIDER = 10000;
 
     event CreditIssued(address indexed user, uint256 amount);
-    event RepaymentMade(address indexed user, uint256 amount);
+    event DebtRepaid(address indexed user, uint256 amount, uint256 remainingDebt);
+    event CollateralWithdrawn(address indexed user, uint256 amount);
     event LiquidationExecuted(address indexed borrower, address indexed liquidator, uint256 debtCovered, uint256 collateralSeized);
 
     constructor(address payable _vaultAddress, address _priceFeed, address _creditToken) Ownable(msg.sender) {
@@ -44,7 +49,7 @@ contract CreditManager is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Returns the latest price from Chainlink Oracle
+     * @dev Returns the latest BNB/USD price from oracle
      */
     function getLatestPrice() public view returns (int256) {
         ( , int256 price, , , ) = priceFeed.latestRoundData();
@@ -52,19 +57,14 @@ contract CreditManager is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Calculates maximum borrowable amount based on collateral and price.
+     * @dev Max borrow capacity given current collateral and debt
      */
     function getBorrowCapacity(address user) public view returns (uint256) {
         (uint256 collateral, uint256 debt, ) = vault.vaults(user);
         if (collateral == 0) return 0;
 
         uint256 price = uint256(getLatestPrice());
-        // Price has 8 decimals usually, but we work in 18 decimals for ETH/BNB
-        // Standard Chainlink reward is in 8 decimals, but opBNB adapter might vary.
-        // We assume price is normalized to 18 decimals or we handle it here.
-        // For opBNB BNB/USD, it is usually 8 decimals.
         uint256 collateralValueUsd = (collateral * price) / 1e8; 
-        
         uint256 maxBorrowUsd = (collateralValueUsd * LTV_RATIO) / BPS_DIVIDER;
         
         if (maxBorrowUsd <= debt) return 0;
@@ -72,38 +72,70 @@ contract CreditManager is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Calculates health factor. < 1e18 means liquidatable.
+     * @dev Health Factor: < 1e18 means liquidatable.
+     *      Calculated as (CollateralUsd × LiquidationThreshold) / Debt
      */
     function getHealthFactor(address user) public view returns (uint256) {
         (uint256 collateral, uint256 debt, ) = vault.vaults(user);
-        if (debt == 0) return 100 * 1e18; // Super healthy
+        if (debt == 0) return 100 * 1e18; // healthy
 
         uint256 price = uint256(getLatestPrice());
         uint256 collateralValueUsd = (collateral * price) / 1e8;
-
-        // Health = (CollateralUsd * Threshold) / Debt
         uint256 collateralValueInDebtPower = (collateralValueUsd * LIQUIDATION_THRESHOLD) / BPS_DIVIDER;
         return (collateralValueInDebtPower * 1e18) / debt;
     }
 
+    /**
+     * @dev Borrow vUSD against locked BNB collateral (up to 70% LTV)
+     */
     function borrow(uint256 amountUsd) external nonReentrant {
         uint256 capacity = getBorrowCapacity(msg.sender);
         require(amountUsd <= capacity, "CreditManager: Insufficient capacity (LTV breach)");
 
         ( , uint256 debt, ) = vault.vaults(msg.sender);
-        uint256 newDebt = debt + amountUsd;
-        
-        vault.updateDebt(msg.sender, newDebt);
-        
-        // Mint the synthetic credit tokens to the user
+        vault.updateDebt(msg.sender, debt + amountUsd);
         creditToken.mint(msg.sender, amountUsd);
 
         emit CreditIssued(msg.sender, amountUsd);
     }
 
     /**
-     * @dev Default Logic: Liquidate a position that has fallen below the health threshold.
-     * Liquidator pays debt in BNB (for hackathon demo) and receives collateral + 5% bonus.
+     * @dev Repay vUSD debt (partial or full).
+     *      User must approve this contract to spend their vUSD before calling.
+     *      After full repayment, user can withdraw collateral via the vault.
+     */
+    function repay(uint256 amountUsd) external nonReentrant {
+        ( , uint256 debt, ) = vault.vaults(msg.sender);
+        require(debt > 0, "CreditManager: No active debt");
+        require(amountUsd > 0, "CreditManager: Amount must be > 0");
+        require(amountUsd <= debt, "CreditManager: Cannot repay more than debt");
+        require(creditToken.balanceOf(msg.sender) >= amountUsd, "CreditManager: Insufficient vUSD balance");
+        require(creditToken.allowance(msg.sender, address(this)) >= amountUsd, "CreditManager: Approve vUSD first");
+
+        uint256 newDebt = debt - amountUsd;
+
+        // Burn the vUSD tokens (destroy the credit)
+        creditToken.burn(msg.sender, amountUsd);
+
+        // Reduce recorded debt in vault
+        vault.updateDebt(msg.sender, newDebt);
+
+        emit DebtRepaid(msg.sender, amountUsd, newDebt);
+    }
+
+    /**
+     * @dev Withdraw collateral — only if debt is fully repaid (handled by vault)
+     */
+    function withdrawCollateral(uint256 amount) external nonReentrant {
+        ( , uint256 debt, ) = vault.vaults(msg.sender);
+        require(debt == 0, "CreditManager: Repay all debt first");
+        vault.withdrawCollateral(amount);
+        emit CollateralWithdrawn(msg.sender, amount);
+    }
+
+    /**
+     * @dev Liquidate an underwater position (health < 1.0).
+     *      Liquidator pays debt in BNB, receives collateral + 5% bonus.
      */
     function liquidate(address borrower) external payable nonReentrant {
         uint256 health = getHealthFactor(borrower);
@@ -112,21 +144,15 @@ contract CreditManager is ReentrancyGuard, Ownable {
         (uint256 collateral, uint256 debt, ) = vault.vaults(borrower);
         uint256 price = uint256(getLatestPrice());
         
-        // Debt is in USD. Liquidator must pay Debt in BNB.
         uint256 debtInBnb = (debt * 1e8) / price;
         require(msg.value >= debtInBnb, "CreditManager: Insufficient BNB to cover USD debt");
 
-        // Calculate collateral to seize (with bonus)
         uint256 collateralToSeize = (debtInBnb * (BPS_DIVIDER + LIQUIDATION_BONUS)) / BPS_DIVIDER;
         if (collateralToSeize > collateral) collateralToSeize = collateral;
 
-        // Reset borrower debt
         vault.updateDebt(borrower, 0);
-        
-        // Seize collateral from vault
         vault.withdrawToLiquidator(borrower, msg.sender, collateralToSeize);
 
-        // Refund any excess BNB sent (Safety first)
         uint256 excess = msg.value - debtInBnb;
         if (excess > 0) {
             payable(msg.sender).transfer(excess);
