@@ -308,6 +308,35 @@ app.post("/api/activity/log", async (req, res) => {
     res.json({ status: "logged" });
 });
 
+/**
+ * 6. Marketplace Purchase
+ */
+app.post("/api/marketplace/purchase", async (req, res) => {
+    const { address, itemId, price } = req.body;
+    const timestamp = new Date().toISOString();
+
+    console.log(`[Marketplace] 🛒 Purchase: User ${address} bought item ${itemId} for $${price}`);
+
+    const logEntry = {
+        type: "MARKETPLACE_PURCHASE",
+        address,
+        details: `Purchased Item #${itemId} for $${price.toFixed(2)} vUSD credit.`,
+        amount: price.toString(),
+        timestamp
+    };
+
+    try {
+        const history = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf-8"));
+        history.push(logEntry);
+        fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
+    } catch (e) {
+        console.error("Failed to log marketplace purchase");
+    }
+
+    res.json({ success: true, timestamp });
+});
+
+
 app.get("/api/activity/history/:address", (req, res) => {
     const { address } = req.params;
     const page = parseInt(req.query.page as string) || 1;
@@ -331,6 +360,20 @@ app.get("/api/activity/history/:address", (req, res) => {
         res.json({ data: [], total: 0, hasMore: false });
     }
 });
+
+app.get("/api/liquidation/recent", (req, res) => {
+    try {
+        const history = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf-8"));
+        const liquidations = history
+            .filter((h: any) => h.type === "AUTO_LIQUIDATION")
+            .reverse()
+            .slice(0, 10);
+        res.json(liquidations);
+    } catch (e) {
+        res.json([]);
+    }
+});
+
 
 const processing = new Set<string>();
 
