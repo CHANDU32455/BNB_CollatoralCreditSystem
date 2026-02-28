@@ -132,28 +132,21 @@ export const DashboardPage: React.FC = () => {
             return;
         }
 
-        // PQC Mandate Enforcement
-        if (mandateInfo && !mandateInfo.hasMandate) {
-            if (!agreeMandate) {
-                showStatus("Please agree to the PQC Liquidation Mandate to proceed.", true);
-                return;
-            }
-
-            setLoading(true);
+        // 🛡️ PQC Mandate (Demo Enrichment - Non-blocking on Production)
+        if (mandateInfo && !mandateInfo.hasMandate && agreeMandate) {
             try {
-                showStatus("Generating PQC Mandate & Anchoring to Greenfield...");
-                await axios.post(`${BACKEND_URL}/api/vault/sign-agreement`, {
+                console.log("Attempting PQC Mandate signing...");
+                axios.post(`${BACKEND_URL}/api/vault/sign-agreement`, {
                     userAddress: address,
                     pqcToken: pqcToken,
                     loanDetails: { type: "ONBOARDING_DEPOSIT", amount: depositAmount }
+                }).then(() => {
+                    updateStats();
+                }).catch(err => {
+                    console.warn("PQC Signing background error:", err);
                 });
-                showStatus("Mandate Signed! Now securing collateral...");
-            } catch (err: any) {
-                console.error("PQC Signing Error:", err);
-                const errMsg = err.response?.data?.error || "PQC Signing failed. Please try again.";
-                showStatus(errMsg, true);
-                setLoading(false);
-                return;
+            } catch (err) {
+                console.warn("PQC background trigger failed");
             }
         }
 
