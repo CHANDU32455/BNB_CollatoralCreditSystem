@@ -72,8 +72,8 @@ export const useStats = (address: string | null) => {
             const collatUsd = collatAmount * bnbPrice;
 
             setStats({
-                collateral: collatAmount.toFixed(4),
-                debt: debtAmount.toFixed(2),
+                collateral: collatAmount.toFixed(6),
+                debt: debtAmount.toFixed(6),
                 borrowCapacity: (collatUsd * (0.7 + bonusFactor) - debtAmount).toFixed(2),
                 price: bnbPrice.toFixed(2),
                 balance: parseFloat(ethers.formatEther(balanceRaw)).toFixed(4),

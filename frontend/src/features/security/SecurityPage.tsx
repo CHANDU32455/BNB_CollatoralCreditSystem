@@ -4,7 +4,7 @@ import { useStats } from '../../hooks/useStats';
 import { Card, Button } from '../../components/common/UI';
 import { ShieldCheck, History, ExternalLink, ArrowRightLeft, FileText, Database, ShieldAlert, ChevronRight } from 'lucide-react';
 import axios from 'axios';
-import { BACKEND_URL } from '../../utils/constants';
+import { BACKEND_URL, BUCKET_NAME } from '../../utils/constants';
 
 import { Link } from 'react-router-dom';
 
@@ -170,14 +170,14 @@ export const SecurityPage: React.FC = () => {
                         </div>
                         <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <Database size={24} className={mandate?.hasMandate ? "text-success" : "text-muted"} />
-                            <div>
+                            <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>
                                     {mandate?.hasMandate ? 'Signed Agreement' : 'Storage Provider'}
                                 </div>
                                 <div className="text-muted" style={{ fontSize: '0.7rem' }}>
                                     {mandate?.hasMandate ? (
                                         <a
-                                            href={mandate.cid?.startsWith('http') ? mandate.cid : `https://testnet.greenfieldscan.com/object/${mandate.cid}`}
+                                            href={mandate.cid?.startsWith('http') ? mandate.cid : `https://testnet.dcellar.io/object/${BUCKET_NAME}/${mandate.cid}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ color: 'var(--success)', textDecoration: 'none' }}
@@ -188,7 +188,6 @@ export const SecurityPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-
                     </Card>
 
                     <Card style={{ border: '1px solid var(--danger)', background: 'rgba(239, 68, 68, 0.05)' }}>

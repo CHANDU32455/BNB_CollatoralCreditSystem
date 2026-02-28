@@ -8,8 +8,11 @@ import {
     ArrowDownCircle,
     ShieldCheck,
     ChevronRight,
-    RefreshCw
+    RefreshCw,
+    ExternalLink
 } from 'lucide-react';
+import axios from 'axios';
+import { BACKEND_URL, BUCKET_NAME } from '../../utils/constants';
 
 export const DashboardPage: React.FC = () => {
     const { address } = useAuth();
@@ -27,6 +30,16 @@ export const DashboardPage: React.FC = () => {
     const [withdrawLoading, setWithdrawLoading] = useState(false);
 
     const [status, setStatus] = useState<{ msg: string, isError: boolean } | null>(null);
+    const [agreeMandate, setAgreeMandate] = useState(false);
+    const [mandateInfo, setMandateInfo] = useState<{ hasMandate: boolean; cid: string | null } | null>(null);
+
+    React.useEffect(() => {
+        if (address) {
+            axios.get(`${BACKEND_URL}/api/vault/mandate-status/${address}`)
+                .then(res => setMandateInfo(res.data))
+                .catch(err => console.error("Error fetching mandate:", err));
+        }
+    }, [address]);
 
     const showStatus = (msg: string, isError: boolean = false) => {
         setStatus({ msg, isError });
@@ -75,8 +88,8 @@ export const DashboardPage: React.FC = () => {
             return;
         }
 
-        // Polite debt check
-        if (parseFloat(stats.debt) > 0) {
+        // Robust debt check (handles tiny dust)
+        if (parseFloat(stats.debt) > 0.000001) {
             showStatus("Please settle your outstanding vUSD debt before recovering your collateral. 🛡️", true);
             return;
         }
@@ -99,7 +112,11 @@ export const DashboardPage: React.FC = () => {
                 showStatus("Withdrawal canceled.", false);
             } else {
                 console.error(e);
-                showStatus("Withdrawal failed. Check Health Factor!", true);
+                // More nuanced error message
+                const isDebtError = e.message?.toLowerCase().includes("repay") || parseFloat(stats.debt) > 0;
+                showStatus(isDebtError
+                    ? "Withdrawal Denied: Secure your debt first! 🛡️"
+                    : "Withdrawal failed. Check collateral balance & Health Factor!", true);
             }
         } finally {
             setWithdrawLoading(false);
@@ -114,12 +131,39 @@ export const DashboardPage: React.FC = () => {
             showStatus("Please enter a valid tBNB amount.", true);
             return;
         }
+
+        // PQC Mandate Enforcement
+        if (mandateInfo && !mandateInfo.hasMandate) {
+            if (!agreeMandate) {
+                showStatus("Please agree to the PQC Liquidation Mandate to proceed.", true);
+                return;
+            }
+
+            setLoading(true);
+            try {
+                showStatus("Generating PQC Mandate & Anchoring to Greenfield...");
+                await axios.post(`${BACKEND_URL}/api/vault/sign-agreement`, {
+                    userAddress: address,
+                    loanDetails: { type: "ONBOARDING_DEPOSIT", amount: depositAmount }
+                });
+                showStatus("Mandate Signed! Now securing collateral...");
+            } catch (err) {
+                console.error(err);
+                showStatus("PQC Signing failed. Please try again.", true);
+                setLoading(false);
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             await depositCollateral(depositAmount);
             setDepositAmount('');
             showStatus("Deposit successful! Your collateral is now secured on opBNB.");
             updateStats();
+            // Refresh mandate status
+            const newMandate = await axios.get(`${BACKEND_URL}/api/vault/mandate-status/${address}`);
+            setMandateInfo(newMandate.data);
         } catch (e: any) {
             if (e.code === 4001 || e.message?.includes('rejected')) {
                 showStatus("Transaction canceled.", false);
@@ -289,11 +333,51 @@ export const DashboardPage: React.FC = () => {
                                     justifyContent: 'space-between',
                                     alignItems: 'center'
                                 }}>
-                                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Estimated Credit Power:</span>
                                     <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem' }}>
                                         +${((parseFloat(depositAmount) || 0) * parseFloat(stats.price) * (0.7 + (riskData?.trustFactorBonus / 100 || 0))).toFixed(2)} vUSD
                                     </span>
                                 </div>
+
+                                {mandateInfo && !mandateInfo.hasMandate && (
+                                    <div style={{
+                                        marginBottom: '1.5rem',
+                                        display: 'flex',
+                                        gap: '0.75rem',
+                                        background: 'rgba(189, 0, 255, 0.05)',
+                                        padding: '1rem',
+                                        borderRadius: '12px',
+                                        border: '1px solid var(--accent)',
+                                        alignItems: 'flex-start'
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            id="mandate-check"
+                                            checked={agreeMandate}
+                                            onChange={(e) => setAgreeMandate(e.target.checked)}
+                                            style={{ marginTop: '0.2rem', cursor: 'pointer' }}
+                                        />
+                                        <label htmlFor="mandate-check" style={{ fontSize: '0.75rem', lineHeight: '1.4', cursor: 'pointer' }}>
+                                            I agree to the <b>PQC Liquidation Mandate</b>. I grant the protocol step-in rights to preserve solvency, with tamper-proof auditing on <b>BNB Greenfield</b>.
+                                        </label>
+                                    </div>
+                                )}
+
+                                {mandateInfo?.hasMandate && (
+                                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                                        <div className="status-badge" style={{ fontSize: '0.7rem', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
+                                            <ShieldCheck size={12} style={{ marginRight: '4px' }} />
+                                            Mandate Secured:
+                                            <a
+                                                href={mandateInfo.cid?.startsWith('http') ? mandateInfo.cid : `https://testnet.dcellar.io/object/${BUCKET_NAME}/${mandateInfo.cid}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ color: 'inherit', textDecoration: 'underline', marginLeft: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                                            >
+                                                View Proof <ExternalLink size={10} />
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <Button grow onClick={handleDeposit} isLoading={loading}>
                                 Lock Collateral

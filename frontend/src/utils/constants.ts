@@ -3,6 +3,8 @@ export const VAULT_ADDRESS = import.meta.env.VITE_VAULT_ADDRESS;
 export const CREDIT_MANAGER_ADDRESS = import.meta.env.VITE_CREDIT_MANAGER_ADDRESS;
 export const CREDIT_TOKEN_ADDRESS = import.meta.env.VITE_CREDIT_TOKEN_ADDRESS;
 export const OLD_VAULT_ADDRESS = import.meta.env.VITE_OLD_VAULT_ADDRESS;
+export const BUCKET_NAME = "bnbvault-pqc-audit";
+
 
 export const VAULT_ABI = [
     "function vaults(address) view returns (uint256 collateralAmount, uint256 debtAmount, uint256 lastUpdated)",

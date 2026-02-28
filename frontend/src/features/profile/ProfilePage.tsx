@@ -14,7 +14,7 @@ import {
     Globe
 } from 'lucide-react';
 import axios from 'axios';
-import { BACKEND_URL } from '../../utils/constants';
+import { BACKEND_URL, BUCKET_NAME } from '../../utils/constants';
 
 export const ProfilePage: React.FC = () => {
     const { address, user, logout } = useAuth();
@@ -95,16 +95,27 @@ export const ProfilePage: React.FC = () => {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span className="text-muted">Greenfield Mandate</span>
-                                <span className={`badge ${mandate.hasMandate ? 'badge-success' : 'badge-warning'}`} style={{
-                                    background: mandate.hasMandate ? 'rgba(34, 197, 94, 0.1)' : 'rgba(243, 186, 47, 0.1)',
-                                    color: mandate.hasMandate ? 'var(--success)' : 'var(--primary)',
-                                    padding: '0.25rem 0.75rem',
-                                    borderRadius: '20px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700
-                                }}>
-                                    {mandate.hasMandate ? 'SIGNED' : 'MISSING'}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <span className={`badge ${mandate.hasMandate ? 'badge-success' : 'badge-warning'}`} style={{
+                                        background: mandate.hasMandate ? 'rgba(34, 197, 94, 0.1)' : 'rgba(243, 186, 47, 0.1)',
+                                        color: mandate.hasMandate ? 'var(--success)' : 'var(--primary)',
+                                        padding: '0.25rem 0.75rem',
+                                        borderRadius: '20px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700
+                                    }}>
+                                        {mandate.hasMandate ? (
+                                            <a
+                                                href={mandate.cid?.startsWith('http') ? mandate.cid : `https://testnet.dcellar.io/object/${BUCKET_NAME}/${mandate.cid}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ color: 'inherit', textDecoration: 'none' }}
+                                            >
+                                                SIGNED <ExternalLink size={10} style={{ marginLeft: '4px' }} />
+                                            </a>
+                                        ) : 'MISSING'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </Card>

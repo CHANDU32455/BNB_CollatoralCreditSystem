@@ -8,38 +8,35 @@ Welcome to the official documentation for the **BNB Collateral Credit System**. 
 
 ### [🏗️ Technical Architecture](./Architecture.md)
 *   Detailed breakdown of the **opBNB + Greenfield + QidCloud** trinity.
-*   System sequence diagrams and data flow models.
 *   Security analysis of ML-DSA (Post-Quantum Cryptography) implementation.
 
 ### [🛠️ Setup & Development](./Setup.md)
-*   Local environment configuration.
-*   Environment variable templates.
-*   Step-by-step "Quick Start" for the frontend and backend.
+*   Local environment configuration and "Quick Start" guide.
+*   **New:** Testing the "Quantum Identity Hub" and "One-Click Economy" flows.
 
 ### [🚀 Implementation Plan](./Implementation_Plan.md)
 *   Feature roadmap and hackathon completion checklist.
-*   Project milestones and success metrics.
+*   **Status:** Production Ready for Demo.
 
 ### [🏆 Hackathon Submission Guide](./SUBMISSION.md)
 *   **Essential Links**: Tweet/X link and Demo Video.
-*   **Contract Ledger**: opBNB Testnet addresses for verification.
-*   **Future Planning**: Our dedicated 6-month roadmap and post-hackathon vision.
-*   **Notes for Judges**: Highlighting QidCloud PQC and Greenfield integration.
+*   **Contract Ledger**: Final opBNB Testnet addresses.
+*   **Roadmap**: Our dedicated 6-month post-hackathon vision.
 
 ### [🎙️ Pitch & Demo Script](./Pitch_Script.md)
-*   A structured narrative for a 3–5 minute presentation.
-*   Key speaking points and technical value propositions.
+*   3–5 minute presentation narrative.
+*   **New:** Focus on **Quantum Identity** and **Self-Healing Liquidations**.
 
-### [🏆 Hackathon Submission Guide](./Hackathon_Guide.md)
-*   Final checklist for submission to the BNB Chain Hackathon portal.
-*   Summary of key innovations and problem-solving impact.
+### [🏆 Presentation & Guides](./Hackathon_Guide.md)
+*   Summary of key innovations: PQC, Greenfield Auditing, and Unified Profile.
 
 ---
 
 ## 🌟 Key Technical Highlights
 *   **Decentralized Trinity**: Hybrid architecture using opBNB (Execution), Greenfield (Audit), and QidCloud (Identity).
-*   **Post-Quantum Hybrid**: Uses FIPS 203 compliant ML-DSA signatures for all critical mandates.
-*   **Autonomous Security**: A "Guardian Network" that maintains protocol solvency via verified Greenfield proofs.
+*   **Post-Quantum Hybrid**: Uses NIST-standard ML-DSA signatures for all critical mandates.
+*   **Reputation Engine**: BscScan-powered users rewards for "Veteran" BNB Chain users.
+*   **Robust Transaction Layer**: Explicit Nonce management for zero-fail DeFi flows.
 
 ---
 
