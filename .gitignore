@@ -1,45 +1,53 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment Variables
+# Build outputs
+dist/
+build/
+backend/dist/
+frontend/dist/
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+
+# Environment variables (CRITICAL)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-*.env
+*.env*
 
-# Build Outputs
-dist/
-build/
-artifacts/
-cache/
-typechain/
-typechain-types/
-
-# Logs and system files
+# Local data & logs
+backend/history.json
+backend/greenfield_storage.json
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# OS files
 .DS_Store
-.history/
-*.log
+Thumbs.db
+.ipynb_checkpoints/
 
-# Backend specific
-backend/history.json
-
-# IDEs
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+.project
+.settings/
+.classpath
 
-# Temporary files
+# Scratch files
+plan.txt
+rough.txt
+walkthrough.txt
 tmp/
-project.fragment.lock
-.agents/
-.agent/
-_agents/
-_agent/
+/tmp/
+temp/
