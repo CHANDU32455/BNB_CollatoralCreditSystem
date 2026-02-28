@@ -47,11 +47,13 @@ export const useBlockchain = (address: string | null) => {
         const signer = await getSigner();
         const provider = await getProvider();
         const gasPrice = await getGasPrice(provider);
+        const nonce = await provider.getTransactionCount(address, 'latest');
 
         const tx = await signer.sendTransaction({
             to: VAULT_ADDRESS,
             value: ethers.parseEther(amount),
             gasPrice,
+            nonce,
             type: 0 // Explicit Legacy Transaction to avoid fee errors
         });
 
@@ -66,9 +68,11 @@ export const useBlockchain = (address: string | null) => {
         const provider = await getProvider();
         const contract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
         const gasPrice = await getGasPrice(provider);
+        const nonce = await provider.getTransactionCount(address, 'latest');
 
         const tx = await contract.borrow(ethers.parseEther(amount), {
             gasPrice,
+            nonce,
             type: 0
         });
         await tx.wait();
@@ -83,16 +87,25 @@ export const useBlockchain = (address: string | null) => {
         const gasPrice = await getGasPrice(provider);
         const amountWei = ethers.parseEther(amount);
 
+        // Fetch fresh nonce
+        let nonce = await provider.getTransactionCount(address, 'latest');
+
         const vUsdContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, ERC20_ABI, signer);
+        console.log(`[Repay] Sending Approve with nonce: ${nonce}`);
         const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei, {
             gasPrice,
+            nonce: nonce,
             type: 0
         });
         await approveTx.wait();
 
+        // Increment nonce for the second transaction in the same flow
+        nonce++;
+        console.log(`[Repay] Sending Repay with nonce: ${nonce}`);
         const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
         const tx = await creditContract.repay(amountWei, {
             gasPrice,
+            nonce: nonce,
             type: 0
         });
         await tx.wait();
@@ -106,12 +119,14 @@ export const useBlockchain = (address: string | null) => {
         const signer = await getSigner();
         const provider = await getProvider();
         const gasPrice = await getGasPrice(provider);
+        const nonce = await provider.getTransactionCount(address, 'latest');
 
         const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
         const amountWei = ethers.parseEther(amount);
 
         const tx = await creditContract.withdrawCollateral(amountWei, {
             gasPrice,
+            nonce,
             type: 0
         });
         await tx.wait();
