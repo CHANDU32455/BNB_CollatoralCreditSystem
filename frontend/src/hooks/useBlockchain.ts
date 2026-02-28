@@ -31,20 +31,28 @@ export const useBlockchain = (address: string | null) => {
         }
     }, [address]);
 
+    const getGasPrice = async (provider: ethers.BrowserProvider) => {
+        try {
+            const feeData = await provider.getFeeData();
+            // opBNB often returns 0 for priority fee, so we use gasPrice with a buffer
+            return (feeData.gasPrice! * 140n) / 100n;
+        } catch (e) {
+            // Fallback for RPCs that don't support getFeeData well (approx 0.05 gwei)
+            return (50000000n * 140n) / 100n;
+        }
+    };
+
     const depositCollateral = async (amount: string) => {
         if (!address) return;
         const signer = await getSigner();
         const provider = await getProvider();
-
-        // Let provider/MetaMask handle nonce to avoid "underpriced" errors
-        // but add a healthy gas buffer to clear transactions instantly
-        const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 140n) / 100n; // 40% buffer for instant inclusion
+        const gasPrice = await getGasPrice(provider);
 
         const tx = await signer.sendTransaction({
             to: VAULT_ADDRESS,
             value: ethers.parseEther(amount),
-            gasPrice
+            gasPrice,
+            type: 0 // Explicit Legacy Transaction to avoid fee errors
         });
 
         await tx.wait();
@@ -57,11 +65,12 @@ export const useBlockchain = (address: string | null) => {
         const signer = await getSigner();
         const provider = await getProvider();
         const contract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
+        const gasPrice = await getGasPrice(provider);
 
-        const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 140n) / 100n;
-
-        const tx = await contract.borrow(ethers.parseEther(amount), { gasPrice });
+        const tx = await contract.borrow(ethers.parseEther(amount), {
+            gasPrice,
+            type: 0
+        });
         await tx.wait();
         await logActivity("BORROW", `Issued $${amount} USD Credit`, tx.hash, amount);
         return tx;
@@ -71,17 +80,21 @@ export const useBlockchain = (address: string | null) => {
         if (!address) return;
         const signer = await getSigner();
         const provider = await getProvider();
+        const gasPrice = await getGasPrice(provider);
         const amountWei = ethers.parseEther(amount);
 
-        const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 140n) / 100n;
-
         const vUsdContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, ERC20_ABI, signer);
-        const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei, { gasPrice });
+        const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei, {
+            gasPrice,
+            type: 0
+        });
         await approveTx.wait();
 
         const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
-        const tx = await creditContract.repay(amountWei, { gasPrice });
+        const tx = await creditContract.repay(amountWei, {
+            gasPrice,
+            type: 0
+        });
         await tx.wait();
 
         await logActivity("REPAY", `Repaid $${amount} USD debt`, tx.hash, amount);
@@ -92,18 +105,19 @@ export const useBlockchain = (address: string | null) => {
         if (!address) return;
         const signer = await getSigner();
         const provider = await getProvider();
-        const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 140n) / 100n;
+        const gasPrice = await getGasPrice(provider);
 
         const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
         const amountWei = ethers.parseEther(amount);
 
-        const tx = await creditContract.withdrawCollateral(amountWei, { gasPrice });
+        const tx = await creditContract.withdrawCollateral(amountWei, {
+            gasPrice,
+            type: 0
+        });
         await tx.wait();
         await logActivity("WITHDRAW", `Withdrew ${amount} tBNB collateral`, tx.hash, amount);
         return tx;
     };
-
 
     return {
         depositCollateral,

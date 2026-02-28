@@ -45,6 +45,12 @@ export const DashboardPage: React.FC = () => {
             return;
         }
 
+        // Check if user has enough vUSD tokens
+        if (parseFloat(repayAmount) > parseFloat(stats.creditBalance)) {
+            showStatus(`Insufficient vUSD balance! You need $${repayAmount} but only have $${stats.creditBalance}.`, true);
+            return;
+        }
+
         setRepayLoading(true);
         try {
             await repayDebt(repayAmount);
