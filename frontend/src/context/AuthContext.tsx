@@ -5,6 +5,7 @@ import { BACKEND_URL } from '../utils/constants';
 
 interface AuthContextType {
     address: string | null;
+    user: any | null; // QidCloud user data
     isLoggedIn: boolean;
     pqcSecured: boolean;
     pqcToken: string | null;
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [address, setAddress] = useState<string | null>(localStorage.getItem('vault_addr'));
+    const [user, setUser] = useState<any | null>(JSON.parse(localStorage.getItem('vault_user') || 'null'));
     const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('vault_isLoggedIn') === 'true');
     const [pqcSecured, setPqcSecured] = useState(localStorage.getItem('vault_pqcSecured') === 'true');
     const [pqcToken, setPqcToken] = useState<string | null>(localStorage.getItem('vault_pqcToken'));
@@ -50,8 +52,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const onPqcSuccess = (user: any, token: string) => {
         console.log("Qid Auth Success for user:", user);
+        setUser(user);
         setPqcToken(token);
         setPqcSecured(true);
+        localStorage.setItem('vault_user', JSON.stringify(user));
         localStorage.setItem('vault_pqcToken', token);
         localStorage.setItem('vault_pqcSecured', 'true');
     };
@@ -82,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return (
         <AuthContext.Provider value={{
-            address, isLoggedIn, pqcSecured, pqcToken, loading, qid,
+            address, user, isLoggedIn, pqcSecured, pqcToken, loading, qid,
             connectWallet, logout, onPqcSuccess, finalizeLogin
         }}>
             {children}

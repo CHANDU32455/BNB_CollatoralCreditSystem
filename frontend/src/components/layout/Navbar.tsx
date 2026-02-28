@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Wallet, Lock, LayoutDashboard, ShoppingCart, ShieldAlert, Zap, LogOut } from 'lucide-react';
+import { Wallet, Lock, LayoutDashboard, ShoppingCart, ShieldAlert, Zap, LogOut, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Navbar: React.FC = () => {
@@ -33,9 +33,21 @@ export const Navbar: React.FC = () => {
 
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 {address ? (
-                    <div className="status-badge status-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Wallet size={14} /> {address.slice(0, 6)}...{address.slice(-4)}
-                    </div>
+                    <Link to="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="status-badge status-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Wallet size={14} /> {address.slice(0, 6)}...{address.slice(-4)}
+                        </div>
+                        <div style={{
+                            padding: '0.4rem',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid var(--border)',
+                            color: 'var(--primary)',
+                            display: 'flex'
+                        }}>
+                            <User size={18} />
+                        </div>
+                    </Link>
                 ) : (
                     <span className="text-muted">Not Connected</span>
                 )}
@@ -44,7 +56,7 @@ export const Navbar: React.FC = () => {
                     <motion.button
                         whileHover={{ scale: 1.1 }}
                         onClick={logout}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 0 }}
                     >
                         <LogOut size={20} />
                     </motion.button>
