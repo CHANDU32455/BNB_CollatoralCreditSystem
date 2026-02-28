@@ -117,7 +117,8 @@ export const LoginPage: React.FC = () => {
                         borderRadius: '30px',
                         boxShadow: '0 40px 80px rgba(0,0,0,0.5)',
                         position: 'relative',
-                        overflow: 'hidden'
+                        // overflow: 'hidden' changed to visible for QidCloud UI expansion
+                        overflow: 'visible'
                     }}>
                         <div style={{
                             position: 'absolute',
@@ -175,7 +176,7 @@ export const LoginPage: React.FC = () => {
                                     {pqcSecured && <ShieldCheck size={18} className="text-accent" />}
                                 </div>
                                 {!pqcSecured ? (
-                                    <div style={{ height: '52px' }}>
+                                    <div style={{ minHeight: '52px' }}>
                                         <QidSignInButton
                                             sdk={qid}
                                             onSuccess={onPqcSuccess}
