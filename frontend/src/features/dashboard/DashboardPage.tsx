@@ -15,7 +15,7 @@ import axios from 'axios';
 import { BACKEND_URL, BUCKET_NAME } from '../../utils/constants';
 
 export const DashboardPage: React.FC = () => {
-    const { address } = useAuth();
+    const { address, pqcToken } = useAuth();
     const { stats, riskData, isSyncing, updateStats, chainInfo } = useStats(address);
     const { depositCollateral, borrowCredit, repayDebt, withdrawCollateral } = useBlockchain(address);
 
@@ -144,12 +144,14 @@ export const DashboardPage: React.FC = () => {
                 showStatus("Generating PQC Mandate & Anchoring to Greenfield...");
                 await axios.post(`${BACKEND_URL}/api/vault/sign-agreement`, {
                     userAddress: address,
+                    pqcToken: pqcToken,
                     loanDetails: { type: "ONBOARDING_DEPOSIT", amount: depositAmount }
                 });
                 showStatus("Mandate Signed! Now securing collateral...");
-            } catch (err) {
-                console.error(err);
-                showStatus("PQC Signing failed. Please try again.", true);
+            } catch (err: any) {
+                console.error("PQC Signing Error:", err);
+                const errMsg = err.response?.data?.error || "PQC Signing failed. Please try again.";
+                showStatus(errMsg, true);
                 setLoading(false);
                 return;
             }
