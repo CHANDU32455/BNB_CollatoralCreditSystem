@@ -31,6 +31,7 @@ const PORT = process.env.PORT || 3001;
 const qid = new QidCloud({
     apiKey: (process.env.QID_API_KEY || process.env.VITE_QID_API_KEY)!,
     tenantId: (process.env.QID_TENANT_ID || process.env.VITE_QID_TENANT_ID)!,
+    baseUrl: process.env.QID_BASE_URL || process.env.VITE_QID_BASE_URL || 'https://api.qidcloud.com'
 });
 
 // opBNB Testnet Provider
@@ -128,6 +129,11 @@ app.get("/api/risk/score/:address", async (req, res) => {
  */
 app.post("/api/vault/sign-agreement", async (req, res) => {
     const { userAddress, loanDetails, pqcToken } = req.body;
+
+    if (!userAddress) {
+        return res.status(400).json({ error: "Missing userAddress in mandate signing request." });
+    }
+
     try {
         const agreementContent = `
 BNB COLLATERAL CREDIT SYSTEM - SMART LOAN AGREEMENT
@@ -160,16 +166,19 @@ before execution.
                 pqcToken // AUTHORIZED: user's session token
             );
         } catch (vaultErr: any) {
-            console.error(`[QidVault] ❌ Upload failed: ${vaultErr.message}`);
-            return res.status(403).json({ error: `PQC Authorization Failure: ${vaultErr.message}` });
+            console.error(`[QidVault] ❌ Upload failed:`, vaultErr);
+            const errorMsg = vaultErr.response?.data?.message || vaultErr.message || "Unknown Enclave Error";
+            return res.status(403).json({ error: `PQC Authorization Failure: ${errorMsg}` });
         }
 
         // 3. Anchoring to BNB Greenfield for Public Proof (Scan Explorer)
         console.log(`[Greenfield] Anchoring mandate proof...`);
+        const qidFileId = uploadResponse.file?.id || "N/A";
+
         const gfResult = await anchorAuditLog("PQC_MANDATE", userAddress, {
             agreement: agreementContent,
             signature: pqcSignature,
-            qidFileId: uploadResponse.file.id
+            qidFileId
         });
 
         // 4. Persist local reference for Risk Engine bonus
@@ -177,7 +186,8 @@ before execution.
         storage[userAddress.toLowerCase()] = {
             content: agreementContent,
             signature: pqcSignature,
-            cid: gfResult?.scanUrl || uploadResponse.file.id, // Prefer Greenfield Scan URL
+            qidFileId: qidFileId,
+            cid: gfResult?.scanUrl || qidFileId,
             timestamp: new Date().toISOString()
         };
         fs.writeFileSync(STORAGE_PATH, JSON.stringify(storage, null, 2));
@@ -187,7 +197,7 @@ before execution.
             content: agreementContent,
             pqcSignature,
             storageProvider: "BNB Greenfield",
-            cid: gfResult?.scanUrl || uploadResponse.file.id,
+            cid: gfResult?.scanUrl || qidFileId,
             status: "Persisted & Publicly Anchored"
         });
     } catch (error: any) {

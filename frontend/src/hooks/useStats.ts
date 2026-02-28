@@ -24,7 +24,7 @@ export const useStats = (address: string | null) => {
     const [riskData, setRiskData] = useState<any>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [chainInfo, setChainInfo] = useState({ name: 'opBNB', block: '0' });
-    const [hasMandate, setHasMandate] = useState(true);
+    const [hasMandate, setHasMandate] = useState(false);
     const [legacyCollateral, setLegacyCollateral] = useState('0.00');
 
     const fetchRiskScore = useCallback(async (addr: string) => {

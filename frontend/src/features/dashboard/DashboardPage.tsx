@@ -340,12 +340,12 @@ export const DashboardPage: React.FC = () => {
                                     </span>
                                 </div>
 
-                                {mandateInfo && !mandateInfo.hasMandate && (
+                                {!mandateInfo?.hasMandate && (
                                     <div style={{
                                         marginBottom: '1.5rem',
                                         display: 'flex',
                                         gap: '0.75rem',
-                                        background: 'rgba(189, 0, 255, 0.05)',
+                                        background: 'rgba(189, 0, 255, 0.1)',
                                         padding: '1rem',
                                         borderRadius: '12px',
                                         border: '1px solid var(--accent)',
@@ -356,7 +356,7 @@ export const DashboardPage: React.FC = () => {
                                             id="mandate-check"
                                             checked={agreeMandate}
                                             onChange={(e) => setAgreeMandate(e.target.checked)}
-                                            style={{ marginTop: '0.2rem', cursor: 'pointer' }}
+                                            style={{ marginTop: '0.2rem', cursor: 'pointer', accentColor: 'var(--accent)' }}
                                         />
                                         <label htmlFor="mandate-check" style={{ fontSize: '0.75rem', lineHeight: '1.4', cursor: 'pointer' }}>
                                             I agree to the <b>PQC Liquidation Mandate</b>. I grant the protocol step-in rights to preserve solvency, with tamper-proof auditing on <b>BNB Greenfield</b>.
