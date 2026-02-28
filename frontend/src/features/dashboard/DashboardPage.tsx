@@ -53,7 +53,7 @@ export const DashboardPage: React.FC = () => {
 
         setRepayLoading(true);
         try {
-            await repayDebt(repayAmount);
+            await repayDebt(repayAmount, (msg) => showStatus(msg));
             setRepayAmount('');
             showStatus("Debt repaid! vUSD balance updated.");
             updateStats();

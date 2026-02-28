@@ -150,29 +150,29 @@ before execution.
         // For the demo bridge, we use the server's PQC context.
         const pqcSignature = "ml-dsa-65_" + Buffer.from(agreementContent).toString('base64').slice(0, 80);
 
-        // 2. Upload to BNB Greenfield via QidCloud SDK
-        // This encrypts the data before it hits Greenfield.
-        console.log(`[Greenfield] Persisting agreement for ${userAddress}...`);
-
-        // Convert Buffer to Blob for Node.js 22+ native FormData compatibility
+        // 2. Upload to QidCloud Vault (E2EE)
+        console.log(`[QidVault] Encrypting agreement for ${userAddress}...`);
         const blob = new Blob([Buffer.from(agreementContent)], { type: 'text/plain' });
-
         const uploadResponse = await qid.vault.upload(
             blob,
             `agreement_${userAddress.toLowerCase()}_${Date.now()}.txt`,
-            {
-                userAddress,
-                signature: pqcSignature,
-                type: 'LOAN_AGREEMENT'
-            }
+            { userAddress, signature: pqcSignature, type: 'LOAN_AGREEMENT' }
         );
 
-        // 3. Persist local reference for Risk Engine bonus
+        // 3. Anchoring to BNB Greenfield for Public Proof (Scan Explorer)
+        console.log(`[Greenfield] Anchoring mandate proof...`);
+        const gfResult = await anchorAuditLog("PQC_MANDATE", userAddress, {
+            agreement: agreementContent,
+            signature: pqcSignature,
+            qidFileId: uploadResponse.file.id
+        });
+
+        // 4. Persist local reference for Risk Engine bonus
         const storage = JSON.parse(fs.readFileSync(STORAGE_PATH, "utf-8"));
         storage[userAddress.toLowerCase()] = {
             content: agreementContent,
             signature: pqcSignature,
-            cid: uploadResponse.file.id, // The QidCloud FileID acts as the Greenfield abstraction CID
+            cid: gfResult?.scanUrl || uploadResponse.file.id, // Prefer Greenfield Scan URL
             timestamp: new Date().toISOString()
         };
         fs.writeFileSync(STORAGE_PATH, JSON.stringify(storage, null, 2));
@@ -182,8 +182,8 @@ before execution.
             content: agreementContent,
             pqcSignature,
             storageProvider: "BNB Greenfield",
-            cid: uploadResponse.file.id,
-            status: "Persisted & E2EE Encrypted"
+            cid: gfResult?.scanUrl || uploadResponse.file.id,
+            status: "Persisted & Publicly Anchored"
         });
     } catch (error: any) {
         console.error("[Greenfield] Upload Error:", error.message);

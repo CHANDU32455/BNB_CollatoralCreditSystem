@@ -80,7 +80,7 @@ export const useBlockchain = (address: string | null) => {
         return tx;
     };
 
-    const repayDebt = async (amount: string) => {
+    const repayDebt = async (amount: string, onStatus?: (msg: string) => void) => {
         if (!address) return;
         const signer = await getSigner();
         const provider = await getProvider();
@@ -91,7 +91,7 @@ export const useBlockchain = (address: string | null) => {
         let nonce = await provider.getTransactionCount(address, 'latest');
 
         const vUsdContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, ERC20_ABI, signer);
-        console.log(`[Repay] Sending Approve with nonce: ${nonce}`);
+        if (onStatus) onStatus("STEP 1/2: Approving vUSD...");
         const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei, {
             gasPrice,
             nonce: nonce,
@@ -101,7 +101,7 @@ export const useBlockchain = (address: string | null) => {
 
         // Increment nonce for the second transaction in the same flow
         nonce++;
-        console.log(`[Repay] Sending Repay with nonce: ${nonce}`);
+        if (onStatus) onStatus("STEP 2/2: Confirming Payment...");
         const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
         const tx = await creditContract.repay(amountWei, {
             gasPrice,
