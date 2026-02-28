@@ -37,9 +37,9 @@ export const useBlockchain = (address: string | null) => {
         const provider = await getProvider();
 
         // Let provider/MetaMask handle nonce to avoid "underpriced" errors
-        // but add a small gas buffer to clear transactions faster
+        // but add a healthy gas buffer to clear transactions instantly
         const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 110n) / 100n; // 10% buffer
+        const gasPrice = (feeData.gasPrice! * 140n) / 100n; // 40% buffer for instant inclusion
 
         const tx = await signer.sendTransaction({
             to: VAULT_ADDRESS,
@@ -59,7 +59,7 @@ export const useBlockchain = (address: string | null) => {
         const contract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
 
         const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 110n) / 100n;
+        const gasPrice = (feeData.gasPrice! * 140n) / 100n;
 
         const tx = await contract.borrow(ethers.parseEther(amount), { gasPrice });
         await tx.wait();
@@ -74,7 +74,7 @@ export const useBlockchain = (address: string | null) => {
         const amountWei = ethers.parseEther(amount);
 
         const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 110n) / 100n;
+        const gasPrice = (feeData.gasPrice! * 140n) / 100n;
 
         const vUsdContract = new ethers.Contract(CREDIT_TOKEN_ADDRESS, ERC20_ABI, signer);
         const approveTx = await vUsdContract.approve(CREDIT_MANAGER_ADDRESS, amountWei, { gasPrice });
@@ -93,7 +93,7 @@ export const useBlockchain = (address: string | null) => {
         const signer = await getSigner();
         const provider = await getProvider();
         const feeData = await provider.getFeeData();
-        const gasPrice = (feeData.gasPrice! * 110n) / 100n;
+        const gasPrice = (feeData.gasPrice! * 140n) / 100n;
 
         const creditContract = new ethers.Contract(CREDIT_MANAGER_ADDRESS, CREDIT_ABI, signer);
         const amountWei = ethers.parseEther(amount);

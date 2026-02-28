@@ -36,10 +36,14 @@ const qid = new QidCloud({
 // opBNB Testnet Provider
 const provider = new ethers.JsonRpcProvider("https://opbnb-testnet-rpc.bnbchain.org");
 
-// Contract Addresses (Deployed 2026-02-25)
-const VAULT_ADDRESS = process.env.VITE_VAULT_ADDRESS!;
-const CREDIT_MANAGER_ADDRESS = process.env.VITE_CREDIT_MANAGER_ADDRESS!;
-const PRICE_ORACLE_ADDRESS = process.env.VITE_PRICE_ORACLE_ADDRESS!;
+// Contract Addresses (Use VITE_ prefix for compatibility with shared .env, or standard naming)
+const VAULT_ADDRESS = (process.env.VITE_VAULT_ADDRESS || process.env.VAULT_ADDRESS)!;
+const CREDIT_MANAGER_ADDRESS = (process.env.VITE_CREDIT_MANAGER_ADDRESS || process.env.CREDIT_MANAGER_ADDRESS)!;
+const PRICE_ORACLE_ADDRESS = (process.env.VITE_PRICE_ORACLE_ADDRESS || process.env.PRICE_ORACLE_ADDRESS)!;
+
+if (!VAULT_ADDRESS || !CREDIT_MANAGER_ADDRESS || !PRICE_ORACLE_ADDRESS) {
+    console.error("[Startup] ❌ Missing Contract Addresses in Environment Variables!");
+}
 
 // --- Endpoints ---
 
@@ -290,20 +294,31 @@ app.post("/api/activity/log", async (req, res) => {
         history.push(logEntry);
         fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
-        // 2. REAL PERMANENCE: Anchor directly to BNB Greenfield via official SDK
+        // 2. REAL PERMANENCE: Anchor directly to BNB Greenfield in the BACKGROUND
         if (["AUTO_LIQUIDATION", "BORROW", "DEPOSIT", "UPGRADE", "REPAY", "WITHDRAW"].includes(type)) {
-            const gfResult = await anchorAuditLog(type, address, logEntry);
-            if (gfResult) {
-                // Store the real Greenfield scan URL as the CID reference
-                const lastIdx = history.length - 1;
-                history[lastIdx].greenfieldCid = gfResult.scanUrl;
-                history[lastIdx].greenfieldObject = gfResult.objectName;
-                fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
-                console.log(`[Greenfield] ✅ Anchored: ${gfResult.scanUrl}`);
-            }
+            // FIRE AND FORGET: Don't 'await' here so the frontend gets an instant response
+            anchorAuditLog(type, address, logEntry).then(gfResult => {
+                if (gfResult) {
+                    const latestHistory = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf-8"));
+                    // Find the entry we just added (match by timestamp and address)
+                    const entryIdx = latestHistory.findIndex((h: any) =>
+                        h.timestamp === timestamp &&
+                        h.address.toLowerCase() === address.toLowerCase()
+                    );
+
+                    if (entryIdx !== -1) {
+                        latestHistory[entryIdx].greenfieldCid = gfResult.scanUrl;
+                        latestHistory[entryIdx].greenfieldObject = gfResult.objectName;
+                        fs.writeFileSync(HISTORY_PATH, JSON.stringify(latestHistory, null, 2));
+                        console.log(`[Greenfield] ✅ Anchored (Async): ${gfResult.scanUrl}`);
+                    }
+                }
+            }).catch(e => {
+                console.error("[Greenfield] ❌ Background upload failed:", e.message);
+            });
         }
     } catch (e: any) {
-        console.error("Failed to persist to Greenfield:", e.message);
+        console.error("Failed to log activity locally:", e.message);
     }
 
     res.json({ status: "logged" });
