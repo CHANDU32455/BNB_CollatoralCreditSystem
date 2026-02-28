@@ -224,8 +224,8 @@ const syncRealPrice = async () => {
         const resp = await axios.get("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT");
         const realPrice = parseFloat(resp.data.price);
 
-        // Only sync if price moved by more than $0.05
-        if (lastSyncedPrice !== 0 && Math.abs(realPrice - lastSyncedPrice) < 0.05) {
+        // Only sync if price moved by more than $1.00 (reduces transaction spam)
+        if (lastSyncedPrice !== 0 && Math.abs(realPrice - lastSyncedPrice) < 1.0) {
             isSyncingPrice = false;
             return;
         }
@@ -250,9 +250,9 @@ const syncRealPrice = async () => {
     }
 };
 
-// Initial sync and then every 60s
+// Initial sync and then every 2 minutes (120s)
 syncRealPrice();
-setInterval(syncRealPrice, 60000);
+setInterval(syncRealPrice, 120000);
 
 app.post("/api/simulate/crash", async (req, res) => {
     let privateKey = process.env.GUARDIAN_PRIVATE_KEY || "";
