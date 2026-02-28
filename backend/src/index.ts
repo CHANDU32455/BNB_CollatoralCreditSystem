@@ -5,9 +5,10 @@ import { ethers } from "ethers";
 import { QidCloud } from "@qidcloud/sdk";
 import axios from "axios";
 import fs from "fs";
-import { anchorAuditLog, ensureBucketExists, BUCKET_NAME } from "./greenfield";
+import { anchorAuditLog, ensureBucketExists, BUCKET_NAME } from "./greenfield.js";
 
-dotenv.config({ path: "../.env" });
+dotenv.config(); // Load from local .env if exists
+dotenv.config({ path: "../.env" }); // Fallback to parent .env for dev environment
 
 const app = express();
 app.use(cors());
