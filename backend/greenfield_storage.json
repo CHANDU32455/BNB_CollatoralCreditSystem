@@ -1,8 +1,0 @@
-{
-  "0x47f9b7ad5a98d2f805c283bc6ddbf02a0c12111e": {
-    "content": "\nBNB COLLATERAL CREDIT SYSTEM - SMART LOAN AGREEMENT\n--------------------------------------------------\nUSER: 0x47f9b7ad5a98d2f805c283bc6ddbf02a0c12111e\nDATE: 2026-02-25T06:29:09.560Z\nDETAILS: {\"upgrade\":true,\"type\":\"SECURITY_UPGRADE_MANDATE\",\"description\":\"Transitioning legacy vault to Greenfield-backed PQC Mandate\"}\n\n[POST-QUANTUM LIQUIDATION MANDATE]\nBy signing this agreement via ML-DSA, the user grants the protocol \n\"Step-In Rights\" to automatically dissolve collateral (Auto-Dissolve) \nif the Health Factor falls below 1.0. This mandate is stored \npermanently on BNB Greenfield and is verified by the Guardian Keeper \nbefore execution.\n--------------------------------------------------\n",
-    "signature": "ml-dsa-65_CkJOQiBDT0xMQVRFUkFMIENSRURJVCBTWVNURU0gLSBTTUFSVCBMT0FOIEFHUkVFTUVOVAotLS0tLS0t",
-    "cid": "de67da69-6603-4ab8-a08e-249041751b30",
-    "timestamp": "2026-02-25T06:29:11.667Z"
-  }
-}
