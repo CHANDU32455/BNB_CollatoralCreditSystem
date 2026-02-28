@@ -24,13 +24,54 @@ As quantum computing approaches, traditional blockchain security is at risk. Our
 *   **Risk Analysis:** Node.js + BscScan V2 Reputation Scoring.
 *   **Frontend:** React (Vite) + Lucide + Glassmorphism / Neon UI.
 
-### 🗺️ The Protocol Trinity
-```text
-   [ QidCloud PQC ]  <-- Auth & Session Security
-          |
-   [  opBNB Layer  ]  <-- Fast Credit & Settlements
-          |
-   [ BNB Greenfield ] <-- Immutable Audit & Proofs
+### 🗺️ System Architecture
+
+```mermaid
+graph TD
+    User["User Wallet"] -->|1. PQC Handshake| QidCloud["QidCloud PQC Enclave"]
+    QidCloud -->|2. Secure Session| DApp["React Frontend"]
+    
+    subgraph backend ["Intelligent Backend Node"]
+        Oracle["Binance Oracle Syncer"] -->|Fetch| BinanceAPI["Binance Market Feed"]
+        Guardian["Guardian Bot"] -->|Monitor| RPC["opBNB RPC"]
+        Indexer["Audit Indexer"] -->|Store| Greenfield["BNB Greenfield Storage"]
+    end
+    
+    subgraph blockchain ["opBNB Execution Layer"]
+        Vault["PQCVault Contract"]
+        CM["Credit Manager"]
+        PriceOracle["On-Chain Price Oracle"]
+    end
+    
+    DApp -->|3. Transaction| Vault
+    Vault -->|Collateral Status| CM
+    PriceOracle -->|Live Price| CM
+    CM -->|Calculate Health| DApp
+    Guardian -->|4. Auto-Liquidation| CM
+    CM -->|Audit Event| Indexer
+```
+
+### 🛣️ User Journey
+
+```mermaid
+sequenceDiagram
+    participant U as "User"
+    participant Q as "QidCloud (PQC Enclave)"
+    participant F as "Frontend (opBNB DApp)"
+    participant V as "PQCVault (opBNB)"
+    participant G as "BNB Greenfield"
+
+    U->>F: 1. Connect Wallet & Auth
+    F->>Q: 2. Biometric Handshake
+    Q-->>F: 3. Session Secured (ML-DSA)
+    U->>F: 4. Deposit tBNB Collateral
+    F->>V: 5. lockBNB()
+    V-->>G: 6. Anchor Deposit Mandate
+    U->>F: 7. One-Click Buy (Marketplace)
+    F->>F: 8. Auto-Borrow Logic
+    F->>V: 9. borrow() & pay()
+    V-->>G: 10. Anchor Audit Log
+    Note over U,G: Quantum-Secure Lifecycle Complete
 ```
 
 ## 📖 Documentation & Guides
