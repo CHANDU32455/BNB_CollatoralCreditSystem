@@ -44,10 +44,22 @@ Thumbs.db
 .settings/
 .classpath
 
+# Internal Prep & Guide Files
+docs/Hackathon_Guide.md
+docs/Pitch_Script.md
+docs/Implementation_Plan.md
+docs/WhatsApp Image*
+
+# Deployment Logs
+contracts/deploy_output.txt
+contracts/latest_deploy.json
+
 # Scratch files
 plan.txt
 rough.txt
 walkthrough.txt
+debug.log
+*.txt.bak
 tmp/
 /tmp/
 temp/
