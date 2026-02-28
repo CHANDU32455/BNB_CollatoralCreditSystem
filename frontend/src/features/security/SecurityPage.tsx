@@ -132,7 +132,7 @@ export const SecurityPage: React.FC = () => {
 
                                             {item.greenfieldCid ? (
                                                 <a
-                                                    href={`https://greenfield-sp.testnet.bnbchain.org/view/${item.greenfieldCid}`}
+                                                    href={item.greenfieldCid.startsWith('http') ? item.greenfieldCid : `https://testnet.greenfieldscan.com/object/${item.greenfieldCid}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="btn-proof"
@@ -177,7 +177,7 @@ export const SecurityPage: React.FC = () => {
                                 <div className="text-muted" style={{ fontSize: '0.7rem' }}>
                                     {mandate?.hasMandate ? (
                                         <a
-                                            href={`https://greenfield-sp.testnet.bnbchain.org/view/${mandate.cid}`}
+                                            href={mandate.cid?.startsWith('http') ? mandate.cid : `https://testnet.greenfieldscan.com/object/${mandate.cid}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ color: 'var(--success)', textDecoration: 'none' }}
@@ -189,6 +189,43 @@ export const SecurityPage: React.FC = () => {
                             </div>
                         </div>
 
+                    </Card>
+
+                    <Card style={{ border: '1px solid var(--danger)', background: 'rgba(239, 68, 68, 0.05)' }}>
+                        <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <ShieldAlert size={20} className="text-danger" /> Guardian Stress Test
+                        </h3>
+                        <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+                            Evaluators: Use this to trigger a real-time market crash (BNB to $200).
+                            This forces the <b>Autonomous Guardian Bot</b> to detect health breaches and execute liquidations.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <Button
+                                variant="outline"
+                                style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                                onClick={async () => {
+                                    if (confirm("Trigger Market Crash? This will lower BNB to $200 and activate the Liquidation Bot.")) {
+                                        try {
+                                            await axios.post(`${BACKEND_URL}/api/simulate/crash`);
+                                            alert("CRASH ACTIVE! Watch the 'Autonomous Audit' logs for liquidation proofs.");
+                                            window.location.reload();
+                                        } catch (e) { alert("Simulation failed. Is backend running?"); }
+                                    }
+                                }}
+                            >
+                                Simulate Crash ($200)
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={async () => {
+                                    await axios.post(`${BACKEND_URL}/api/simulate/recover`);
+                                    alert("Recovery successful. Real-time pricing resumed.");
+                                    window.location.reload();
+                                }}
+                            >
+                                Resume Real-Time Feed
+                            </Button>
+                        </div>
                     </Card>
 
                     <Card>

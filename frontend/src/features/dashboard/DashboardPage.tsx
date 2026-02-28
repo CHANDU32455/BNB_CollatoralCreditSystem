@@ -420,7 +420,7 @@ export const DashboardPage: React.FC = () => {
                             </div>
                             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
                             <a
-                                href={`https://opbnb-testnet.bscscan.com/address/${address}`}
+                                href={`https://testnet.opbnbscan.com/address/${address}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{ textDecoration: 'none' }}

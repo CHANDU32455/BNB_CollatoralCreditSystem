@@ -143,7 +143,7 @@ export const LiquidationPage: React.FC = () => {
                                                 </a>
                                             )}
                                             {log.greenfieldCid && (
-                                                <a href={log.greenfieldCid.startsWith('http') ? log.greenfieldCid : `https://greenfield-sp.testnet.bnbchain.org/view/${log.greenfieldCid}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: 'var(--accent)', textDecoration: 'none' }}>
+                                                <a href={log.greenfieldCid.startsWith('http') ? log.greenfieldCid : `https://testnet.greenfieldscan.com/object/${log.greenfieldCid}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: 'var(--accent)', textDecoration: 'none' }}>
                                                     Greenfield Proof <ExternalLink size={10} />
                                                 </a>
                                             )}

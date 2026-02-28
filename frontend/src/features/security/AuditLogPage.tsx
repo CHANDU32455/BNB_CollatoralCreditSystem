@@ -117,7 +117,7 @@ export const AuditLogPage: React.FC = () => {
                                         )}
                                         {item.greenfieldCid && (
                                             <a
-                                                href={item.greenfieldCid.startsWith('http') ? item.greenfieldCid : `https://greenfield-sp.testnet.bnbchain.org/view/${item.greenfieldCid}`}
+                                                href={item.greenfieldCid.startsWith('http') ? item.greenfieldCid : `https://testnet.greenfieldscan.com/object/${item.greenfieldCid}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="btn-proof"
